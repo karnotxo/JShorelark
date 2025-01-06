@@ -1,0 +1,179 @@
+/* Light theme for Shorelark */
+.root {
+    -fx-base: #f5f5f5;
+    -fx-background: #ffffff;
+    -fx-control-inner-background: #ffffff;
+    -fx-text-fill: #2c3e50;
+}
+
+/* Menu styling */
+.menu-bar {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #e9ecef;
+    -fx-border-width: 0 0 1 0;
+}
+
+.menu-bar .menu-button:hover, .menu-bar .menu-button:focused, .menu-bar .menu-button:showing {
+    -fx-background-color: #e9ecef;
+}
+
+.menu-item {
+    -fx-background-color: #ffffff;
+}
+
+.menu-item:hover, .menu-item:focused {
+    -fx-background-color: #e9ecef;
+}
+
+/* Controls */
+.button {
+    -fx-background-color: #f8f9fa;
+    -fx-text-fill: #2c3e50;
+    -fx-border-color: #dee2e6;
+    -fx-border-radius: 4;
+}
+
+.button:hover {
+    -fx-background-color: #e9ecef;
+}
+
+.slider .track {
+    -fx-background-color: #dee2e6;
+}
+
+.slider .thumb {
+    -fx-background-color: #6c757d;
+}
+
+/* Chart styling */
+.chart {
+    -fx-background-color: transparent;
+}
+
+.chart-plot-background {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 1;
+}
+
+.chart-vertical-grid-lines {
+    -fx-stroke: #e9ecef;
+}
+
+.chart-horizontal-grid-lines {
+    -fx-stroke: #e9ecef;
+}
+
+.chart-series-line {
+    -fx-stroke-width: 2px;
+}
+
+/* About dialog */
+.about-dialog {
+    -fx-background-color: transparent;
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 20, 0, 0, 10);
+}
+
+.about-background {
+    -fx-background-color: linear-gradient(to bottom right, #f8f9fa, #e9ecef);
+    -fx-background-radius: 10;
+}
+
+.about-content {
+    -fx-background-color: rgba(255, 255, 255, 0.9);
+    -fx-background-radius: 10;
+    -fx-padding: 20;
+}
+
+.about-title {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-fill: #2c3e50;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 1, 0, 0, 1);
+}
+
+.about-version {
+    -fx-font-size: 16px;
+    -fx-fill: #6c757d;
+}
+
+.about-description {
+    -fx-font-size: 14px;
+}
+
+.about-description .text {
+    -fx-fill: #2c3e50;
+}
+
+.about-description .hyperlink {
+    -fx-text-fill: #2980b9;
+    -fx-underline: false;
+}
+
+.about-description .hyperlink:hover {
+    -fx-underline: true;
+    -fx-text-fill: #3498db;
+}
+
+.about-particle {
+    -fx-fill: #3498db;
+    -fx-effect: dropshadow(gaussian, #3498db, 10, 0.4, 0, 0),
+                dropshadow(gaussian, #3498db, 5, 0.3, 0, 0);
+}
+
+.about-bird {
+    -fx-fill: #3498db;
+    -fx-stroke: #2980b9;
+    -fx-stroke-width: 1.5;
+    -fx-effect: dropshadow(gaussian, #3498db, 8, 0.4, 0, 0),
+                dropshadow(gaussian, rgba(52,152,219,0.4), 5, 0.3, 0, 0);
+    -fx-smooth: true;
+}
+
+.about-food {
+    -fx-fill: #e74c3c;
+    -fx-stroke: #c0392b;
+    -fx-stroke-width: 1;
+    -fx-effect: dropshadow(gaussian, #e74c3c, 6, 0.4, 0, 0),
+                dropshadow(gaussian, rgba(231,76,60,0.4), 4, 0.3, 0, 0);
+    -fx-smooth: true;
+}
+
+.about-close-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #6c757d;
+    -fx-font-size: 20px;
+    -fx-min-width: 30px;
+    -fx-min-height: 30px;
+    -fx-max-width: 30px;
+    -fx-max-height: 30px;
+    -fx-background-radius: 15;
+    -fx-padding: 0 0 2 0;
+}
+
+.about-close-button:hover {
+    -fx-background-color: rgba(0, 0, 0, 0.05);
+    -fx-text-fill: #2c3e50;
+}
+
+.about-close-button:pressed {
+    -fx-background-color: rgba(0, 0, 0, 0.1);
+    -fx-text-fill: #2c3e50;
+}
+
+/* Splash Screen */
+.splash-screen {
+    -fx-background-color: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 10, 0, 0, 3);
+}
+
+.splash-title {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-fill: #2c3e50;
+}
+
+.splash-status {
+    -fx-fill: #6c757d;
+}
