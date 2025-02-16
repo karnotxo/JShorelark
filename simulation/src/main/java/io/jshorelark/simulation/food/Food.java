@@ -10,8 +10,8 @@ import java.util.Random;
 
 import io.jshorelark.simulation.physics.Vector2D;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Value;
+import lombok.With;
 
 /**
  * Represents food in the simulation.
@@ -19,32 +19,32 @@ import lombok.Setter;
  * @author Jose
  * @version $Id: $Id
  */
+@Value
+@With
 public class Food {
-  /** The position of the food. */
-  @Getter @Setter private Vector2D position;
+  /** The food's position. */
+  Vector2D position;
 
-  /** Creates a new food at the given position. */
-  private Food(Vector2D position) {
-    this.position = position;
-  }
+  /** Whether this food has been consumed. */
+  boolean consumed;
 
   /**
-   * Creates a new food at a random position.
+   * Creates food at the given position.
    *
-   * @param random a {@link java.util.Random} object
-   * @return a {@link io.jshorelark.simulation.food.Food} object
-   */
-  public static Food random(Random random) {
-    return new Food(Vector2D.random(random));
-  }
-
-  /**
-   * Creates a new food at the given position.
-   *
-   * @param position a {@link io.jshorelark.simulation.physics.Vector2D} object
-   * @return a {@link io.jshorelark.simulation.food.Food} object
+   * @param position the position
+   * @return the food
    */
   public static Food at(Vector2D position) {
-    return new Food(position);
+    return new Food(position, false);
+  }
+
+  /**
+   * Creates food at a random position.
+   *
+   * @param random the random number generator
+   * @return the food
+   */
+  public static Food random(Random random) {
+    return at(Vector2D.random(random));
   }
 }

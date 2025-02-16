@@ -117,9 +117,9 @@ public class EvolutionManager {
     }
 
     // Reset food positions
-    for (Food food : simulation.getFoods()) {
-      food.setPosition(Vector2D.random(random));
-    }
+    final var foodsCount = simulation.getFoods().size();
+    simulation.clearFoods();
+    simulation.addFoods(foodsCount, random);
   }
 
   /**
@@ -193,24 +193,6 @@ public class EvolutionManager {
    */
   public double getEyeFovRange() {
     return simulation.getConfig().getEyeFovRange();
-  }
-
-  /**
-   * Gets the world width.
-   *
-   * @return the world width
-   */
-  public double getWorldWidth() {
-    return simulation.getConfig().getWorldWidth();
-  }
-
-  /**
-   * Gets the world height.
-   *
-   * @return the world height
-   */
-  public double getWorldHeight() {
-    return simulation.getConfig().getWorldHeight();
   }
 
   /**

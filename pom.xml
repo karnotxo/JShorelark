@@ -160,6 +160,13 @@
         <version>${picocli.version}</version>
       </dependency>
 
+      <!-- Math -->
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-math3</artifactId>
+        <version>${commons-math3.version}</version>
+      </dependency>
+
       <!-- Logging -->
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -202,6 +209,12 @@
       <groupId>io.soabase.record-builder</groupId>
       <artifactId>record-builder-core</artifactId>
       <scope>provided</scope>
+    </dependency>
+
+    <!-- Math -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-math3</artifactId>
     </dependency>
 
     <!-- Logging -->

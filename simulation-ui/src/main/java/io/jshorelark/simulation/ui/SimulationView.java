@@ -11,6 +11,8 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 
+import org.apache.commons.math3.util.FastMath;
+
 import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
@@ -87,18 +89,12 @@ public class SimulationView extends Pane {
     public double getEyeFovRange() {
       return source.getEyeFovRange();
     }
-
-    public double getWorldWidth() {
-      return source.getWorldWidth();
-    }
-
-    public double getWorldHeight() {
-      return source.getWorldHeight();
-    }
   }
 
   /** The simulation state. */
   private final ViewState state;
+
+  private Runnable onHoveredBirdChanged;
 
   /** The canvas for drawing. */
   private final Canvas canvas;
@@ -183,6 +179,15 @@ public class SimulationView extends Pane {
   }
 
   /**
+   * Sets a callback to be called when the hovered bird changes.
+   *
+   * @param callback the callback to run
+   */
+  public void setOnHoveredBirdChanged(Runnable callback) {
+    this.onHoveredBirdChanged = callback;
+  }
+
+  /**
    * Handles mouse movement events.
    *
    * @param event mouse event
@@ -190,12 +195,11 @@ public class SimulationView extends Pane {
   private void handleMouseMoved(javafx.scene.input.MouseEvent event) {
     screenMousePos = new Vector2D((float) event.getX(), (float) event.getY());
     updateHoveredBird();
-    draw();
   }
 
   /** Updates the currently hovered bird based on mouse position. */
   private void updateHoveredBird() {
-    hoveredBird = null;
+    Bird newHoveredBird = null;
     double closestDistance = Double.MAX_VALUE;
 
     // Convert screen mouse position to world coordinates for distance calculation
@@ -206,9 +210,17 @@ public class SimulationView extends Pane {
       Vector2D worldBirdPos = bird.getPosition(); // Already in world coordinates
       double distance = worldMousePos.subtract(worldBirdPos).length();
       if (distance < worldBirdSize * 2 && distance < closestDistance) {
-        hoveredBird = bird;
+        newHoveredBird = bird;
         closestDistance = distance;
       }
+    }
+
+    if (hoveredBird != newHoveredBird) {
+      hoveredBird = newHoveredBird;
+      if (onHoveredBirdChanged != null) {
+        onHoveredBirdChanged.run();
+      }
+      draw();
     }
   }
 
@@ -249,12 +261,14 @@ public class SimulationView extends Pane {
     gc.setStroke(darkTheme ? DarkTheme.GRID_COLOR : LightTheme.GRID_COLOR);
     gc.setLineWidth(1);
 
+    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
+
     double gridSize = 50;
-    for (double x = 0; x < canvas.getWidth(); x += gridSize) {
-      gc.strokeLine(x, 0, x, canvas.getHeight());
+    for (double x = 0.0d; x < worldScale; x += gridSize) {
+      gc.strokeLine(x, 0.0d, x, worldScale);
     }
-    for (double y = 0; y < canvas.getHeight(); y += gridSize) {
-      gc.strokeLine(0, y, canvas.getWidth(), y);
+    for (double y = 0.0d; y < worldScale; y += gridSize) {
+      gc.strokeLine(0.0d, y, worldScale, y);
     }
   }
 
@@ -314,7 +328,8 @@ public class SimulationView extends Pane {
 
     // Translate and rotate
     gc.translate(screenPos.x(), screenPos.y());
-    gc.rotate(Math.toDegrees(rotation));
+    // Convert from model space (0° up, CCW) to screen space (0° right, CW)
+    gc.rotate(Math.toDegrees(rotation) - 90);
 
     // Draw bird body
     gc.setFill(darkTheme ? DarkTheme.BIRD_COLOR : LightTheme.BIRD_COLOR);
@@ -364,7 +379,7 @@ public class SimulationView extends Pane {
     double fovStart = -state.getEyeFovAngle() / 2;
     double cellAngle = state.getEyeFovAngle() / state.getEyeCells();
 
-    // Scale FOV range relative to world dimensions
+    // Scale FOV range to screen coordinates
     double screenRange = getScreenFovRange();
 
     gc.setStroke(darkTheme ? DarkTheme.EYE_COLOR : LightTheme.EYE_COLOR);
@@ -372,10 +387,16 @@ public class SimulationView extends Pane {
     gc.setLineDashes(2);
 
     // Only draw lines for actual cell boundaries (cells, not cells+1)
-    for (int i = 0; i < state.getEyeCells(); i++) {
+    for (int i = 0; i <= state.getEyeCells(); i++) {
+      // In model space: 0° is up, positive angles go CCW
+      // In screen space: 0° is right, positive angles go CW
+      // So we need to:
+      // 1. Rotate 90° to align up (0°) with right
+      // 2. Negate the angle to change direction (CCW -> CW)
       double angle = fovStart + cellAngle * i;
-      double x = Math.cos(angle) * screenRange;
-      double y = Math.sin(angle) * screenRange;
+      double screenAngle = -angle;
+      double x = FastMath.cos(screenAngle) * screenRange;
+      double y = FastMath.sin(screenAngle) * screenRange;
       gc.strokeLine(0, 0, x, y);
     }
 
@@ -392,11 +413,8 @@ public class SimulationView extends Pane {
     float rotation = bird.getRotation();
     float[] eyeInputs = bird.getVision();
 
-    // Scale FOV range relative to world dimensions
-    double worldScale =
-        Math.min(
-            canvas.getWidth() / state.getWorldWidth(), canvas.getHeight() / state.getWorldHeight());
-    double screenRange = state.getEyeFovRange() * worldScale;
+    // Scale FOV range to screen coordinates
+    double screenRange = getScreenFovRange();
 
     double fovStart = rotation - state.getEyeFovAngle() / 2;
     double cellAngle = state.getEyeFovAngle() / state.getEyeCells();
@@ -426,13 +444,12 @@ public class SimulationView extends Pane {
       gc.setFill(sensorColor);
       gc.beginPath();
       gc.moveTo(screenPos.x(), screenPos.y());
-      gc.arc(
-          screenPos.x(),
-          screenPos.y(),
-          screenRange,
-          screenRange,
-          Math.toDegrees(startAngle),
-          Math.toDegrees(cellAngle));
+
+      // Convert from model space (0° up, CCW) to screen space (0° right, CW)
+      double startScreenAngle = 90 - Math.toDegrees(startAngle);
+      double sweepAngle = -Math.toDegrees(cellAngle); // Negative because we're going CW
+
+      gc.arc(screenPos.x(), screenPos.y(), screenRange, screenRange, startScreenAngle, sweepAngle);
       gc.lineTo(screenPos.x(), screenPos.y());
       gc.closePath();
       gc.fill();
@@ -453,44 +470,38 @@ public class SimulationView extends Pane {
     gc.strokeLine(screenPrevPos.x(), screenPrevPos.y(), screenPos.x(), screenPos.y());
   }
 
-  /** Converts world coordinates to screen coordinates. */
-  private Vector2D worldToScreen(Vector2D worldPos) {
+  /** Converts model space coordinates (0.0 to 1.0) to screen coordinates. */
+  private Vector2D worldToScreen(Vector2D modelPos) {
+    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
     return new Vector2D(
-        (float) ((worldPos.x() / state.getWorldWidth()) * canvas.getWidth()),
-        (float) ((worldPos.y() / state.getWorldHeight()) * canvas.getHeight()));
+        (float) (modelPos.x() * worldScale), (float) ((1 - modelPos.y()) * worldScale));
   }
 
-  /** Converts screen coordinates to world coordinates. */
+  /** Converts screen coordinates to model space coordinates (0.0 to 1.0). */
   private Vector2D screenToWorld(Vector2D screenPos) {
+    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
     return new Vector2D(
-        (float) ((screenPos.x() / canvas.getWidth()) * state.getWorldWidth()),
-        (float) ((screenPos.y() / canvas.getHeight()) * state.getWorldHeight()));
+        (float) (screenPos.x() / worldScale), (float) (1 - screenPos.y() / worldScale));
   }
 
   /** Gets the bird size in screen coordinates. */
   private double getScreenBirdSize() {
-    // Scale bird size relative to world dimensions to maintain proportions
-    double worldScale =
-        Math.min(
-            canvas.getWidth() / state.getWorldWidth(), canvas.getHeight() / state.getWorldHeight());
+    // Scale bird size relative to smallest screen dimension to maintain proportions
+    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
     return state.getBirdSize() * worldScale;
   }
 
   /** Gets the food size in screen coordinates. */
   private double getScreenFoodSize() {
-    // Scale food size relative to world dimensions to maintain proportions
-    double worldScale =
-        Math.min(
-            canvas.getWidth() / state.getWorldWidth(), canvas.getHeight() / state.getWorldHeight());
+    // Scale food size relative to smallest screen dimension to maintain proportions
+    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
     return state.getFoodSize() * worldScale;
   }
 
   /** Gets the field of view range in screen coordinates. */
   private double getScreenFovRange() {
-    // Scale food size relative to world dimensions to maintain proportions
-    double worldScale =
-        Math.min(
-            canvas.getWidth() / state.getWorldWidth(), canvas.getHeight() / state.getWorldHeight());
+    // Scale fov range relative to smallest screen dimension to maintain proportions
+    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
     return state.getEyeFovRange() * worldScale;
   }
 }

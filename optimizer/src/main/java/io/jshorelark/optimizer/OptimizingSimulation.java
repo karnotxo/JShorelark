@@ -17,8 +17,6 @@ import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.Simulation;
 import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.bird.BirdIndividual;
-import io.jshorelark.simulation.food.Food;
-import io.jshorelark.simulation.physics.Vector2D;
 
 import lombok.Getter;
 
@@ -134,13 +132,13 @@ public class OptimizingSimulation {
     // Convert individuals back to birds and reset world
     simulation.clearBirds();
     for (final var individual : newPopulation) {
-      simulation.addBird(((BirdIndividual) individual).toBird(random, simulation.getConfig()));
+      simulation.addBird(((BirdIndividual) individual).toBird());
     }
 
-    // Reset food positions
-    for (Food food : simulation.getFoods()) {
-      food.setPosition(Vector2D.random(random));
-    }
+    // Reset food positions by creating new food items
+    final var foodsCount = simulation.getFoods().size();
+    simulation.clearFoods();
+    simulation.addFoods(foodsCount, random);
 
     return currentStats;
   }

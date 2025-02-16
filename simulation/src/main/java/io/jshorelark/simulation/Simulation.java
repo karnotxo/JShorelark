@@ -11,13 +11,11 @@ import java.util.*;
 import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.events.CollisionEvent;
 import io.jshorelark.simulation.food.Food;
-import io.jshorelark.simulation.physics.Vector2D;
 import io.jshorelark.simulation.physics.World;
 
 import lombok.Getter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
-import reactor.core.publisher.Sinks.Many;
 
 /**
  * Core simulation that manages the world state. Matches Rust's wsm::Simulation.
@@ -33,10 +31,7 @@ public class Simulation {
   private final World world;
 
   /** Sink for collision events. */
-  private final Many<CollisionEvent> collisionSink;
-
-  /** Stream of collision events. */
-  @Getter private final Flux<CollisionEvent> collisionEvents;
+  private final Sinks.Many<CollisionEvent> collisionSink;
 
   /**
    * Creates a new simulation with the given config.
@@ -48,7 +43,6 @@ public class Simulation {
     this.config = config;
     this.world = World.random(config, random);
     this.collisionSink = Sinks.many().multicast().onBackpressureBuffer();
-    this.collisionEvents = collisionSink.asFlux();
   }
 
   /**
@@ -94,18 +88,28 @@ public class Simulation {
 
   /** Processes collisions between birds and food. */
   private void processCollisions(Random random) {
-    for (Bird bird : world.getBirds()) {
-      for (Food food : world.getFoods()) {
+    List<Food> newFoods = new ArrayList<>();
+    for (Food food : world.getFoods()) {
+      boolean wasConsumed = false;
+      for (Bird bird : world.getBirds()) {
         float distance = bird.getPosition().distance(food.getPosition());
         float collisionThreshold = config.getBirdSize() + config.getFoodSize();
         if (distance <= collisionThreshold) {
           bird.eat();
-          food.setPosition(Vector2D.random(random));
+          wasConsumed = true;
           // Emit collision event
-          collisionSink.tryEmitNext(CollisionEvent.create(bird, food, distance));
+          onCollision(CollisionEvent.create(bird, food, distance));
+          break;
         }
       }
+      if (wasConsumed) {
+        // Replace consumed food with new food at random position
+        newFoods.add(Food.random(random));
+      } else {
+        newFoods.add(food);
+      }
     }
+    world.setFoods(newFoods);
   }
 
   /** Processes bird brains. */
@@ -127,6 +131,11 @@ public class Simulation {
     world.clearBirds();
   }
 
+  /** Clears all foods from the world. */
+  public void clearFoods() {
+    world.clearFoods();
+  }
+
   /**
    * Adds a bird to the world.
    *
@@ -134,5 +143,22 @@ public class Simulation {
    */
   public void addBird(Bird bird) {
     world.addBird(bird);
+  }
+
+  /** Steps the simulation forward one tick. */
+  public void step() {
+    processCollisions(new Random());
+    processBrains();
+    processMovements();
+  }
+
+  /** Handles a collision event. */
+  private void onCollision(CollisionEvent event) {
+    collisionSink.tryEmitNext(event);
+  }
+
+  /** Gets an unmodifiable view of the collision events. */
+  public Flux<CollisionEvent> getCollisionEvents() {
+    return collisionSink.asFlux();
   }
 }

@@ -6,8 +6,6 @@
  */
 package io.jshorelark.simulation.bird;
 
-import java.util.Random;
-
 import io.jshorelark.genetic.Chromosome;
 import io.jshorelark.genetic.Individual;
 import io.jshorelark.simulation.Config;
@@ -75,12 +73,10 @@ public class BirdIndividual implements Individual {
   /**
    * Converts this individual back to a bird.
    *
-   * @param random a {@link java.util.Random} object
-   * @param config a {@link io.jshorelark.simulation.Config} object
    * @return a {@link io.jshorelark.simulation.bird.Bird} object
    */
-  public Bird toBird(Random random, Config config) {
-    return Bird.fromChromosome(config, random, getChromosome());
+  public Bird toBird() {
+    return bird.withChromosome(getChromosome());
   }
 
   /** Factory for creating BirdIndividuals from chromosomes. */

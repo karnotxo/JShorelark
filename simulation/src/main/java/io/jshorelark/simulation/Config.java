@@ -16,6 +16,8 @@ import lombok.With;
 /**
  * Configuration for the simulation. Matches Rust's Config struct.
  *
+ * <p>All spatial values are in model space coordinates (0.0 to 1.0).
+ *
  * @author Jose
  * @version $Id: $Id
  */
@@ -24,12 +26,6 @@ import lombok.With;
 @With
 @JsonDeserialize(builder = Config.ConfigBuilder.class)
 public class Config {
-  /** World width. */
-  @Builder.Default float worldWidth = 1.0f;
-
-  /** World height. */
-  @Builder.Default float worldHeight = 1.0f;
-
   /** Number of neurons in each bird's brain. */
   @Builder.Default int brainNeurons = 9;
 
@@ -66,7 +62,7 @@ public class Config {
   /** Speed acceleration factor. */
   @Builder.Default float simSpeedAccel = 0.2f;
 
-  /** Rotation acceleration factor. */
+  /** Rotation acceleration factor in radians per step (π/2 ≈ 1.57 rad). */
   @Builder.Default float simRotationAccel = (float) (Math.PI / 2);
 
   /** Length of each generation in simulation steps. */

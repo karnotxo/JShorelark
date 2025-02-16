@@ -39,8 +39,6 @@ class BirdTest {
             .simSpeedMin(0.0f)
             .simSpeedAccel(0.5f)
             .simRotationAccel(0.3f)
-            .worldWidth(1.0f)
-            .worldHeight(1.0f)
             .build();
 
     random = new Random(42); // Fixed seed for reproducible tests

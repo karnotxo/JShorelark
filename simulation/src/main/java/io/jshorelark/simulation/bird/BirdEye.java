@@ -8,6 +8,8 @@ package io.jshorelark.simulation.bird;
 
 import java.util.List;
 
+import org.apache.commons.math3.util.FastMath;
+
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
@@ -60,10 +62,15 @@ public class BirdEye {
         continue;
       }
 
-      // Calculate angle to food relative to Y axis (up)
-      float angle = (float) Math.atan2(vec.x(), vec.y());
-      angle = angle - rotation;
-      angle = wrap(angle, -(float) Math.PI, (float) Math.PI);
+      // Calculate angle to food relative to X axis (right)
+      // In Rust, atan2(y, x) gives angle from positive X axis, CCW
+      float angle = (float) FastMath.atan2(vec.x(), vec.y());
+
+      // Adjust for bird's rotation (also CCW from X axis)
+      angle -= rotation;
+
+      // Wrap to [-π, π]
+      angle = wrap(angle, -(float) FastMath.PI, (float) FastMath.PI);
 
       // Skip if food is outside field of view
       if (angle < -fovAngle / 2 || angle > fovAngle / 2) {
@@ -71,7 +78,7 @@ public class BirdEye {
       }
 
       // Map angle to cell
-      angle = angle + fovAngle / 2;
+      angle += fovAngle / 2;
       float cellF = angle / fovAngle * cells;
       int cell = Math.min((int) cellF, cells - 1);
 

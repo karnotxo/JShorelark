@@ -234,6 +234,8 @@ public class SimulationControls extends VBox {
             .onAction(e -> togglePlayPause())
             .build();
     button.setGraphic(SvgIcons.createPlayIcon(16, Color.GRAY));
+    button.setMinWidth(32);
+    button.setMinHeight(32);
 
     // Update button icon based on pause state
     app.pausedProperty()
@@ -255,6 +257,8 @@ public class SimulationControls extends VBox {
             .onAction(e -> Platform.runLater(app::resetSimulation))
             .build();
     result.setGraphic(SvgIcons.createResetIcon(16, Color.GRAY));
+    result.setMinWidth(32);
+    result.setMinHeight(32);
     return result;
   }
 

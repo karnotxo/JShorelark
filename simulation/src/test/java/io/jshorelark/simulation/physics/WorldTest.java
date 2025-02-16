@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("World")
 class WorldTest {
-  private World world;
   private Random random;
   private Config config;
 
@@ -29,12 +28,18 @@ class WorldTest {
   void setUp() {
     random = new Random(42); // Fixed seed for reproducibility
     config = Config.getDefault();
-    world = new World(config);
   }
 
   @Nested
   @DisplayName("collections")
   class Collections {
+    private World world;
+
+    @BeforeEach
+    void setUp() {
+      world = World.builder().config(config).build();
+    }
+
     @Test
     @DisplayName("manages birds collection")
     void managesBirdsCollection() {

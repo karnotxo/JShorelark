@@ -9,6 +9,8 @@ package io.jshorelark.simulation.bird;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.commons.math3.util.FastMath;
+
 import io.jshorelark.genetic.Chromosome;
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.food.Food;
@@ -134,6 +136,17 @@ public class Bird implements Cloneable {
   }
 
   /**
+   * Creates a new bird with the given chromosome.
+   *
+   * @param chromosome a {@link io.jshorelark.genetic.Chromosome} object
+   * @return a {@link io.jshorelark.simulation.bird.Bird} object
+   */
+  public Bird withChromosome(final Chromosome chromosome) {
+    BirdBrain newBrain = BirdBrain.fromChromosome(chromosome, config);
+    return new Bird(position, rotation, vision, speed, eye, newBrain, config);
+  }
+
+  /**
    * Converts this bird to a chromosome.
    *
    * @return a {@link io.jshorelark.genetic.Chromosome} object
@@ -159,11 +172,24 @@ public class Bird implements Cloneable {
    * @param config a {@link io.jshorelark.simulation.Config} object
    */
   public void processBrain(List<Food> foods, Config config) {
+    // Update vision
     vision = eye.processVision(position, rotation, foods);
+
+    // Process brain inputs to get outputs
     float[] outputs = brain.processInputs(vision);
+
+    // Update speed - clamp between min and max
     speed =
-        Math.min(config.getSimSpeedMax(), Math.max(config.getSimSpeedMin(), speed + outputs[0]));
-    rotation += outputs[1];
+        Math.min(
+            config.getSimSpeedMax(),
+            Math.max(config.getSimSpeedMin(), speed + outputs[0] * config.getSimSpeedAccel()));
+
+    // Update rotation - clamp change within acceleration limits
+    float rotationChange = outputs[1] * config.getSimRotationAccel();
+    rotation += rotationChange;
+
+    // Normalize rotation to stay within [0, 2π]
+    rotation = (float) ((rotation + 2 * Math.PI) % (2 * Math.PI));
   }
 
   /** Processes the bird's movement. */
@@ -171,10 +197,18 @@ public class Bird implements Cloneable {
     // Store previous position for trail drawing
     previousPosition = position;
 
+    // Convert from model space angle (CCW from Y) to standard math angle (CCW from X)
+    // by adding π/2 (90°) from our rotation
+    float mathAngle = (float) Math.PI / 2 - rotation;
+
+    // In Rust, 0 radians points right (positive X) and rotation is CCW
     // Calculate movement vector based on rotation
-    float dx = (float) Math.sin(rotation) * speed;
-    float dy = (float) Math.cos(rotation) * speed;
-    position = position.add(new Vector2D(dx, dy));
+    float dx = (float) FastMath.cos(mathAngle) * speed;
+    float dy = (float) FastMath.sin(mathAngle) * speed;
+    Vector2D moveVector = new Vector2D(dx, dy);
+
+    // Add the movement vector to current position
+    position = position.add(moveVector);
 
     // Wrap position around world boundaries
     position = new Vector2D(wrap(position.x()), wrap(position.y()));
