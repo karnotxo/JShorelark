@@ -2,17 +2,19 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.optimizer.analyze;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -21,18 +23,34 @@ import io.jshorelark.optimizer.OptimizationLog;
 import io.jshorelark.optimizer.OptimizationStatistics;
 
 import lombok.extern.slf4j.Slf4j;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 /**
- * Command to analyze simulation results.
+ * Averages the JSONL produced by {@code simulate} per configuration and prints it as CSV.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Mirrors Rust's {@code AnalyzeCmd}. Configurations are kept in a sorted map so two runs over the
+ * same input produce byte-identical CSV.
  */
 @Slf4j
 @Command(name = "analyze", description = "Analyze simulation results")
-public class AnalyzeCommand implements Runnable {
+public final class AnalyzeCommand implements Runnable {
+
+  /** The CSV header, in the same column order as the Rust implementation. */
+  private static final String[] COLUMNS = {
+    "brain_neurons",
+    "eye_fov_range",
+    "eye_fov_angle",
+    "eye_cells",
+    "ga_mut_chance",
+    "ga_mut_coeff",
+    "min_fitness",
+    "max_fitness",
+    "avg_fitness",
+    "median_fitness"
+  };
+
   /** The input file path. */
   @Option(
       names = {"-i", "--input"},
@@ -43,141 +61,107 @@ public class AnalyzeCommand implements Runnable {
   /** The object mapper. */
   private final ObjectMapper mapper = new ObjectMapper();
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Runs the analysis.
-   */
+  /** {@inheritDoc} */
   @Override
   public void run() {
-    try {
-      Map<OptimizationConfig, ConfigurationStats> results = new HashMap<>();
+    var results = readResults();
+    PrintStream out = System.out;
+    out.println(String.join(",", COLUMNS));
+    results.forEach((config, stats) -> printRow(out, config, stats.average()));
+  }
 
-      try (BufferedReader reader = Files.newBufferedReader(inputPath, StandardCharsets.UTF_8)) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          OptimizationLog log = mapper.readValue(line, OptimizationLog.class);
-
-          results
-              .computeIfAbsent(log.getConfig(), k -> new ConfigurationStats())
-              .addStatistics(log.getStatistics());
-        }
-      }
-
-      // Print CSV header
-      System.out.print("brain_neurons");
-      System.out.print(",eye_fov_range");
-      System.out.print(",eye_fov_angle");
-      System.out.print(",eye_cells");
-      System.out.print(",ga_mut_chance");
-      System.out.print(",ga_mut_coeff");
-      System.out.print(",min_fitness");
-      System.out.print(",max_fitness");
-      System.out.print(",avg_fitness");
-      System.out.print(",median_fitness");
-      System.out.println();
-
-      // Print results
-      for (Map.Entry<OptimizationConfig, ConfigurationStats> entry : results.entrySet()) {
-        OptimizationConfig config = entry.getKey();
-        ConfigurationStats stats = entry.getValue();
-        stats.average();
-
-        System.out.print(config.getBrainNeurons());
-        System.out.print("," + config.getEyeFovRange());
-        System.out.print("," + config.getEyeFovAngle());
-        System.out.print("," + config.getEyeCells());
-        System.out.print("," + config.getGaMutChance());
-        System.out.print("," + config.getGaMutCoeff());
-        System.out.print("," + stats.getMinFitness());
-        System.out.print("," + stats.getMaxFitness());
-        System.out.print("," + stats.getAvgFitness());
-        System.out.print("," + stats.getMedianFitness());
-        System.out.println();
+  private Map<OptimizationConfig, FitnessAccumulator> readResults() {
+    Map<OptimizationConfig, FitnessAccumulator> results = new TreeMap<>(AnalyzeCommand::compare);
+    try (BufferedReader reader = Files.newBufferedReader(inputPath, StandardCharsets.UTF_8)) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        OptimizationLog entry = mapper.readValue(line, OptimizationLog.class);
+        results
+            .computeIfAbsent(entry.config(), key -> new FitnessAccumulator())
+            .add(entry.statistics());
       }
     } catch (IOException e) {
       log.error("Failed to analyze results", e);
-      throw new RuntimeException(e);
+      throw new UncheckedIOException(e);
     }
+    return results;
+  }
+
+  private static void printRow(
+      PrintStream out, OptimizationConfig config, OptimizationStatistics stats) {
+    out.printf(
+        "%d,%s,%s,%d,%s,%s,%s,%s,%s,%s%n",
+        config.brainNeurons(),
+        config.eyeFovRange(),
+        config.eyeFovAngle(),
+        config.eyeCells(),
+        config.gaMutChance(),
+        config.gaMutCoeff(),
+        stats.minFitness(),
+        stats.maxFitness(),
+        stats.avgFitness(),
+        stats.medianFitness());
+  }
+
+  /** Total ordering over grid points so the CSV is deterministic. */
+  private static int compare(OptimizationConfig left, OptimizationConfig right) {
+    int result = Integer.compare(left.brainNeurons(), right.brainNeurons());
+    if (result == 0) {
+      result = Float.compare(left.eyeFovRange(), right.eyeFovRange());
+    }
+    if (result == 0) {
+      result = Float.compare(left.eyeFovAngle(), right.eyeFovAngle());
+    }
+    if (result == 0) {
+      result = Integer.compare(left.eyeCells(), right.eyeCells());
+    }
+    if (result == 0) {
+      result = Float.compare(left.gaMutChance(), right.gaMutChance());
+    }
+    if (result == 0) {
+      result = Float.compare(left.gaMutCoeff(), right.gaMutCoeff());
+    }
+    return result;
   }
 }
 
-/** Statistics for a configuration. */
-class ConfigurationStats {
-  /** Number of samples. */
+/** Sums the fitness values of every sample of one configuration. */
+final class FitnessAccumulator {
+
+  /** Number of samples folded in so far. */
   private int samples;
 
-  /** Minimum fitness. */
+  /** Running sums, divided by {@link #samples} when averaging. */
   private float minFitness;
 
-  /**
-   * Maximum fitness.
-   *
-   * @param stats a {@link io.jshorelark.optimizer.OptimizationStatistics} object
-   */
   private float maxFitness;
-
-  /** Average fitness. */
   private float avgFitness;
-
-  /** Median fitness. */
   private float medianFitness;
 
   /**
-   * Adds statistics to this configuration.
+   * Folds one generation's statistics into the running sums.
    *
-   * @param stats a {@link io.jshorelark.optimizer.OptimizationStatistics} object
+   * @param stats the statistics of one generation
    */
-  public void addStatistics(OptimizationStatistics stats) {
+  void add(OptimizationStatistics stats) {
     samples++;
-    minFitness += stats.getGa().getMinFitness();
-    maxFitness += stats.getGa().getMaxFitness();
-    avgFitness += stats.getGa().getAvgFitness();
-    medianFitness += stats.getGa().getMedianFitness();
-  }
-
-  /** Averages the statistics. */
-  public void average() {
-    float sampleCount = samples;
-    minFitness /= sampleCount;
-    maxFitness /= sampleCount;
-    avgFitness /= sampleCount;
-    medianFitness /= sampleCount;
+    minFitness += stats.minFitness();
+    maxFitness += stats.maxFitness();
+    avgFitness += stats.avgFitness();
+    medianFitness += stats.medianFitness();
   }
 
   /**
-   * Gets the minimum fitness.
+   * Divides the running sums by the sample count.
    *
-   * @return a float
+   * @return the averaged statistics, or all zeros when nothing was accumulated
    */
-  public float getMinFitness() {
-    return minFitness;
-  }
-
-  /**
-   * Gets the maximum fitness.
-   *
-   * @return a float
-   */
-  public float getMaxFitness() {
-    return maxFitness;
-  }
-
-  /**
-   * Gets the average fitness.
-   *
-   * @return a float
-   */
-  public float getAvgFitness() {
-    return avgFitness;
-  }
-
-  /**
-   * Gets the median fitness.
-   *
-   * @return a float
-   */
-  public float getMedianFitness() {
-    return medianFitness;
+  OptimizationStatistics average() {
+    if (samples == 0) {
+      return new OptimizationStatistics(0.0f, 0.0f, 0.0f, 0.0f);
+    }
+    float count = samples;
+    return new OptimizationStatistics(
+        minFitness / count, maxFitness / count, avgFitness / count, medianFitness / count);
   }
 }

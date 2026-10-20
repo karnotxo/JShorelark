@@ -2,214 +2,212 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.ui.evolution;
 
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
+import java.util.function.Consumer;
 
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.Simulation;
+import io.jshorelark.simulation.Statistics;
 import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.events.CollisionEvent;
 import io.jshorelark.simulation.food.Food;
-import io.jshorelark.simulation.physics.Vector2D;
-
-import lombok.AccessLevel;
-import lombok.Getter;
-import reactor.core.publisher.Flux;
 
 /**
- * Manages the evolution of birds in the simulation.
+ * Adapts the pure {@link Simulation} to the needs of the JavaFX view.
  *
- * @author Jose
- * @version :
+ * <p>The generation clock lives in the domain: this class only steps the simulation and converts the
+ * domain {@link Statistics} into the UI value type. It used to derive "generation finished" from a
+ * bird's satiation, which made the UI disagree with the reference implementation; that rule now has
+ * exactly one owner, {@code Simulation#step}.
  */
-public class EvolutionManager {
+public final class EvolutionManager {
+
   /** The simulation being managed. */
-  @Getter(AccessLevel.PACKAGE)
   private final Simulation simulation;
 
-  /** The current generation. */
-  @Getter private int generation;
+  /** Observer for food consumption; never {@code null}. */
+  private Consumer<CollisionEvent> collisionHandler = event -> {};
 
-  /** The current statistics. */
-  @Getter private EvolutionStatistics statistics;
+  /** Statistics of the last completed generation, or {@code null} before the first one. */
+  private EvolutionStatistics statistics;
 
   /**
-   * Creates a new evolution manager with default config.
+   * Creates a manager with the reference configuration.
    *
-   * @param random a {@link java.util.Random} object
+   * @param random the random source
    */
   public EvolutionManager(Random random) {
-    this(random, Config.getDefault());
+    this(random, Config.defaults());
   }
 
   /**
-   * Creates a new evolution manager with the given config.
+   * Creates a manager with the given configuration.
    *
-   * @param random a {@link java.util.Random} object
-   * @param config a {@link io.jshorelark.simulation.Config} object
+   * @param random the random source
+   * @param config the simulation configuration
    */
   public EvolutionManager(Random random, Config config) {
-    this.simulation = new Simulation(config, random);
-    this.generation = 0;
-    this.statistics = null;
+    Objects.requireNonNull(random, "random");
+    this.simulation = new Simulation(config, random, this::forwardCollision);
   }
 
   /**
-   * Updates the simulation and returns statistics if a generation is complete.
+   * Registers the observer notified on every food consumption.
    *
-   * @param random a {@link java.util.Random} object
-   * @return a {@link io.jshorelark.simulation.ui.evolution.EvolutionStatistics} object
+   * <p>The callback runs on the thread that steps the simulation; the UI marshals it to the JavaFX
+   * application thread.
+   *
+   * @param handler the observer, or {@code null} to ignore events
+   */
+  public void setCollisionHandler(Consumer<CollisionEvent> handler) {
+    this.collisionHandler = handler == null ? event -> {} : handler;
+  }
+
+  /**
+   * Advances the simulation by one step.
+   *
+   * @param random the random source used to respawn consumed food
+   * @return the statistics of the generation that just ended, or {@code null} if it is still running
    */
   public EvolutionStatistics update(Random random) {
-    // Update simulation
-    simulation.update(random);
-
-    // Check if generation is complete
-    boolean generationComplete = false;
-    for (Bird bird : simulation.getBirds()) {
-      if (bird.getSatiation() >= simulation.getConfig().getSimGenerationLength()) {
-        generationComplete = true;
-        break;
-      }
+    Statistics completed = simulation.step(random);
+    if (completed == null) {
+      return null;
     }
-
-    // If generation complete, evolve population
-    if (generationComplete) {
-      generation++;
-      evolve(random);
-      return statistics;
-    }
-
-    return null;
-  }
-
-  /** Evolves the population. */
-  private void evolve(Random random) {
-    // Calculate statistics
-    float minFitness = Float.MAX_VALUE;
-    float maxFitness = Float.MIN_VALUE;
-    float totalFitness = 0;
-    float[] fitnesses = new float[simulation.getBirds().size()];
-    int i = 0;
-
-    for (Bird bird : simulation.getBirds()) {
-      float fitness = bird.getSatiation();
-      fitnesses[i++] = fitness;
-      minFitness = Math.min(minFitness, fitness);
-      maxFitness = Math.max(maxFitness, fitness);
-      totalFitness += fitness;
-    }
-
-    float avgFitness = totalFitness / simulation.getBirds().size();
-    Arrays.sort(fitnesses);
-    float medianFitness = fitnesses[fitnesses.length / 2];
-
-    statistics =
-        new EvolutionStatistics(generation, minFitness, maxFitness, avgFitness, medianFitness);
-
-    // Reset bird positions and satiation
-    for (Bird bird : simulation.getBirds()) {
-      bird.setPosition(Vector2D.random(random));
-      bird.setRotation(random.nextFloat() * (float) (2 * Math.PI));
-    }
-
-    // Reset food positions
-    final var foodsCount = simulation.getFoods().size();
-    simulation.clearFoods();
-    simulation.addFoods(foodsCount, random);
+    statistics = EvolutionStatistics.from(completed);
+    return statistics;
   }
 
   /**
-   * Gets the foods in the simulation.
+   * Returns the statistics of the last completed generation.
    *
-   * @return a {@link java.util.List} object
+   * @return the statistics, or {@code null} before the first generation ends
+   */
+  public EvolutionStatistics getStatistics() {
+    return statistics;
+  }
+
+  /**
+   * Steps the simulation until a generation completes.
+   *
+   * <p>Mirrors Rust's {@code Simulation::train}, so the terminal's {@code train} command reports
+   * exactly one finished generation instead of a half-stepped one.
+   *
+   * @param random the random source
+   * @return the statistics of the generation that just ended
+   */
+  public EvolutionStatistics train(Random random) {
+    statistics = EvolutionStatistics.from(simulation.train(random));
+    return statistics;
+  }
+
+  /**
+   * Returns the completed generation count.
+   *
+   * @return the generation number
+   */
+  public int getGeneration() {
+    return simulation.getGeneration();
+  }
+
+  /**
+   * Returns the progress of the current generation, in {@code [0, 1]}.
+   *
+   * @return the fraction of the generation clock already elapsed
+   */
+  public double getGenerationProgress() {
+    return Math.min((double) simulation.getAge() / simulation.getConfig().simGenerationLength(), 1.0);
+  }
+
+  /**
+   * Returns the foods in the simulation.
+   *
+   * @return an unmodifiable view of the food list
    */
   public List<Food> getFoods() {
     return simulation.getFoods();
   }
 
   /**
-   * Gets the food size in the simulation.
+   * Returns the birds in the simulation.
    *
-   * @return a float
-   */
-  public float getFoodSize() {
-    return simulation.getConfig().getFoodSize();
-  }
-
-  /**
-   * Gets the birds in the simulation.
-   *
-   * @return a {@link java.util.List} object
+   * @return an unmodifiable view of the population
    */
   public List<Bird> getBirds() {
     return simulation.getBirds();
   }
 
   /**
-   * Adds food items to the simulation.
+   * Adds food items at random positions.
    *
-   * @param count a int
-   * @param random a {@link java.util.Random} object
+   * @param count how many items to add
+   * @param random the random source
    */
   public void addFoods(int count, Random random) {
     simulation.addFoods(count, random);
   }
 
   /**
-   * Gets the bird size.
+   * Returns the simulation configuration.
    *
-   * @return the bird size
+   * @return the immutable configuration
+   */
+  public Config getConfig() {
+    return simulation.getConfig();
+  }
+
+  /**
+   * Returns the food collision radius.
+   *
+   * @return the food size in world units
+   */
+  public float getFoodSize() {
+    return simulation.getConfig().foodSize();
+  }
+
+  /**
+   * Returns the bird drawing size.
+   *
+   * @return the bird size in world units
    */
   public double getBirdSize() {
-    return simulation.getConfig().getBirdSize();
+    return simulation.getConfig().birdSize();
   }
 
   /**
-   * Gets the eye FOV angle.
+   * Returns the total field of view.
    *
-   * @return the eye FOV angle
+   * @return the field of view in radians
    */
   public double getEyeFovAngle() {
-    return simulation.getConfig().getEyeFovAngle();
+    return simulation.getConfig().eyeFovAngle();
   }
 
   /**
-   * Gets the number of eye cells.
+   * Returns the number of vision cells.
    *
-   * @return the number of eye cells
+   * @return the cell count
    */
   public int getEyeCells() {
-    return simulation.getConfig().getEyeCells();
+    return simulation.getConfig().eyeCells();
   }
 
   /**
-   * Gets the eye FOV range.
+   * Returns the maximum vision distance.
    *
-   * @return the eye FOV range
+   * @return the field of view range in world units
    */
   public double getEyeFovRange() {
-    return simulation.getConfig().getEyeFovRange();
+    return simulation.getConfig().eyeFovRange();
   }
 
-  /**
-   * Gets the simulation generation length.
-   *
-   * @return the simulation generation length
-   */
-  public double getSimGenerationLength() {
-    return simulation.getConfig().getSimGenerationLength();
-  }
-
-  /**
-   * Gets the collision events.
-   *
-   * @return the collision events
-   */
-  public Flux<CollisionEvent> getCollisionEvents() {
-    return simulation.getCollisionEvents();
+  private void forwardCollision(CollisionEvent event) {
+    collisionHandler.accept(event);
   }
 }

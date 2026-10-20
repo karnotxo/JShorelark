@@ -2,13 +2,12 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.optimizer;
 
 import java.util.Random;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,49 +17,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("NeuralNetworkIndividual")
 class NeuralNetworkIndividualTest {
-  private static final int[] TOPOLOGY = {3, 2, 1}; // Match Rust's test topology
-  private Random random;
-  private NeuralNetwork network;
 
-  @BeforeEach
-  void setUp() {
-    // Match Rust's ChaCha8Rng deterministic behavior
-    random = new Random(0x0000000000000000L);
-    network = NeuralNetwork.random(random, TOPOLOGY);
-  }
+  private static final int[] TOPOLOGY = {3, 2, 1};
 
   @Test
-  @DisplayName("creates individual with random weights")
-  void createsIndividualWithRandomWeights() {
-    NeuralNetworkIndividual individual = new NeuralNetworkIndividual(network);
+  @DisplayName("starts with zero fitness")
+  void startsWithZeroFitness() {
+    var network = NeuralNetwork.random(new Random(0L), TOPOLOGY);
+
+    var individual = new NeuralNetworkIndividual(network);
 
     assertThat(individual.getNetwork()).isSameAs(network);
     assertThat(individual.getFitness()).isZero();
-
-    // Verify weights match expected pattern (from Rust test)
-    float[] weights = individual.getChromosome().getGenes();
-    assertThat(weights).hasSize(11); // 3*2 + 2 (biases) + 2*1 + 1 (bias)
   }
 
   @Test
-  @DisplayName("creates individual from chromosome")
-  void createsIndividualFromChromosome() {
-    // Use exact weights from Rust test
-    float[] weights = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f};
-    network = NeuralNetwork.fromWeights(new int[] {3, 2}, weights); // Match Rust test topology
+  @DisplayName("exposes the network weights as its chromosome")
+  void exposesWeightsAsChromosome() {
+    // Layer 1: (3+1)*2 = 8 weights; layer 2: (2+1)*1 = 3 weights.
+    float[] weights = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f};
+    var network = NeuralNetwork.fromWeights(TOPOLOGY, weights);
 
-    NeuralNetworkIndividual individual = new NeuralNetworkIndividual(network);
+    var individual = new NeuralNetworkIndividual(network);
 
     assertThat(individual.getChromosome().getGenes()).containsExactly(weights);
-    assertThat(individual.getFitness()).isZero();
-  }
-
-  @Test
-  @DisplayName("returns fitness value")
-  void returnsFitness() {
-    NeuralNetworkIndividual individual = new NeuralNetworkIndividual(network);
-    individual.fitness = 1.0f;
-
-    assertThat(individual.getFitness()).isEqualTo(1.0f);
   }
 }

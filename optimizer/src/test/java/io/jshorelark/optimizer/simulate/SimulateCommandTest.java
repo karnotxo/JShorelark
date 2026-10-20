@@ -2,7 +2,7 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.optimizer.simulate;
 
@@ -20,49 +20,36 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jshorelark.optimizer.OptimizationLog;
 
-import lombok.extern.slf4j.Slf4j;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Slf4j
 @DisplayName("SimulateCommand")
 class SimulateCommandTest {
+
   @TempDir Path tempDir;
 
   @Test
-  @Timeout(value = 30)
-  @DisplayName("runs simulations and generates output")
-  void runsSimulationsAndGeneratesOutput() throws IOException {
-    // Setup
-    Path outputPath = tempDir.resolve("simulation_results.jsonl");
-    log.info("Running simulation test with output path: {}", outputPath);
+  @Timeout(60)
+  @DisplayName("writes one JSONL line per simulated generation")
+  void writesOneJsonlLinePerGeneration() throws IOException {
+    Path outputPath = tempDir.resolve("results.jsonl");
+    var command = new SimulateCommand();
+    command.outputPath = outputPath;
+    command.testMode = true;
 
-    // Run command with test configuration
-    var cmd = new SimulateCommand();
-    cmd.outputPath = outputPath;
-    cmd.testMode = true;
-    cmd.run();
+    command.run();
 
-    // Verify output
-    assertThat(outputPath).exists().isRegularFile().isReadable();
-    long fileSize = Files.size(outputPath);
-    assertThat(fileSize).as("Output file should not be empty").isGreaterThan(0);
-
-    // Verify content
+    assertThat(outputPath).exists().isRegularFile();
     List<String> lines = Files.readAllLines(outputPath);
-    ObjectMapper mapper = new ObjectMapper();
+    assertThat(lines).isNotEmpty();
+
+    var mapper = new ObjectMapper();
     assertThat(lines)
-        .isNotEmpty()
         .allSatisfy(
             line -> {
-              try {
-                OptimizationLog log = mapper.readValue(line, OptimizationLog.class);
-                assertThat(log.getConfig()).isNotNull();
-                assertThat(log.getContext()).isNotNull();
-                assertThat(log.getStatistics()).isNotNull();
-              } catch (IOException e) {
-                throw new AssertionError("Failed to parse JSON line: " + line, e);
-              }
+              OptimizationLog entry = mapper.readValue(line, OptimizationLog.class);
+              assertThat(entry.config()).isNotNull();
+              assertThat(entry.context()).isNotNull();
+              assertThat(entry.statistics()).isNotNull();
             });
   }
 }

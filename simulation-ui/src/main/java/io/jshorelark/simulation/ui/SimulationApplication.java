@@ -217,6 +217,20 @@ public class SimulationApplication extends Application {
     this.simulationSpeed = speed;
   }
 
+  /**
+   * Creates an evolution manager and wires it to the UI's collision feedback.
+   *
+   * <p>The handler is set here, in one place, so a reset cannot silently lose the sound effects.
+   *
+   * @param config the configuration for the new manager
+   * @return a fully wired manager
+   */
+  private EvolutionManager createEvolutionManager(Config config) {
+    var manager = new EvolutionManager(random, config);
+    manager.setCollisionHandler(event -> Platform.runLater(() -> handleCollision(event)));
+    return manager;
+  }
+
   /** Resets the simulation. */
   public void resetSimulation() {
     // Pause the simulation during reset
@@ -227,7 +241,7 @@ public class SimulationApplication extends Application {
         () -> {
           try {
             // Create new evolution manager
-            evolutionManager = new EvolutionManager(random);
+            evolutionManager = createEvolutionManager(Config.defaults());
 
             // Create new simulation view
             var newSimulationView = new SimulationView(evolutionManager);
@@ -269,7 +283,7 @@ public class SimulationApplication extends Application {
   @Override
   public void init() {
     // Initialize evolution manager before UI
-    evolutionManager = new EvolutionManager(random);
+    evolutionManager = createEvolutionManager(Config.defaults());
 
     // Ensure splash screen shows for at least 3 seconds
     try {
@@ -277,11 +291,6 @@ public class SimulationApplication extends Application {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-
-    // Subscribe to collision events
-    evolutionManager
-        .getCollisionEvents()
-        .subscribe(event -> Platform.runLater(() -> handleCollision(event)));
   }
 
   /** {@inheritDoc} */
@@ -518,7 +527,7 @@ public class SimulationApplication extends Application {
     Platform.runLater(
         () -> {
           try {
-            Config config = Config.getDefault();
+            Config config = Config.defaults();
 
             // Parse arguments
             for (int i = 1; i < args.length; i++) {
@@ -563,7 +572,7 @@ public class SimulationApplication extends Application {
   /** Resets the simulation with the given config. */
   private void resetSimulationWithConfig(Config config, boolean wasPaused) {
     // Create new evolution manager with the updated config
-    evolutionManager = new EvolutionManager(random, config);
+    evolutionManager = createEvolutionManager(config);
 
     // Create new simulation view
     var newSimulationView = new SimulationView(evolutionManager);
@@ -598,7 +607,7 @@ public class SimulationApplication extends Application {
       if (i > 0) {
         println("");
       }
-      var stats = evolutionManager.update(random);
+      var stats = evolutionManager.train(random);
       println(stats.toString());
       fitnessChart.update(
           stats.getGeneration(),
@@ -675,16 +684,7 @@ public class SimulationApplication extends Application {
    * @return a double representing the progress
    */
   public double getGenerationProgress() {
-    if (evolutionManager == null) return 0.0;
-
-    double maxSatiation = evolutionManager.getSimGenerationLength();
-    double currentMaxSatiation = 0.0;
-
-    for (final var bird : evolutionManager.getBirds()) {
-      currentMaxSatiation = Math.max(currentMaxSatiation, bird.getSatiation());
-    }
-
-    return Math.min(currentMaxSatiation / maxSatiation, 1.0);
+    return evolutionManager == null ? 0.0 : evolutionManager.getGenerationProgress();
   }
 
   /** Handles generation completion. */

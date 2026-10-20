@@ -188,17 +188,16 @@ public final class Simulation {
   /**
    * Feeds every bird that is close enough to a food item.
    *
-   * <p>Mirrors Rust's {@code process_collisions}: the radius is {@link Config#getFoodSize()} and
+   * <p>Mirrors Rust's {@code process_collisions}: the radius is {@link Config#foodSize()} and
    * nothing else, a consumed item is repositioned rather than removed, and the loop is bird-major so
    * several birds may eat the same item in the same step.
    */
   private void processCollisions(Random random) {
-    float foodSize = config.getFoodSize();
+    float foodSize = config.foodSize();
     for (Bird bird : world.getBirds()) {
       for (Food food : world.getFoods()) {
         float distance = bird.getPosition().distance(food.getPosition());
-        float collisionThreshold = config.getBirdSize() + config.foodSize();
-        if (distance <= collisionThreshold) {
+        if (distance <= foodSize) {
           bird.eat();
           world.respawnFood(food, Food.random(random));
           collisionListener.onCollision(CollisionEvent.create(bird, food, distance));
@@ -229,7 +228,7 @@ public final class Simulation {
    */
   private Statistics tryEvolving(Random random) {
     age++;
-    if (age <= config.getSimGenerationLength()) {
+    if (age <= config.simGenerationLength()) {
       return null;
     }
     return evolve(random);
@@ -251,7 +250,7 @@ public final class Simulation {
         GeneticAlgorithm.create(
             new RouletteWheelSelection(),
             new UniformCrossover(),
-            GaussianMutation.create(config.getGaMutChance(), config.getGaMutCoeff()),
+            GaussianMutation.create(config.gaMutChance(), config.gaMutCoeff()),
             new BirdIndividual.Factory(config));
 
     List<BirdIndividual> individuals = world.getBirds().stream().map(BirdIndividual::of).toList();

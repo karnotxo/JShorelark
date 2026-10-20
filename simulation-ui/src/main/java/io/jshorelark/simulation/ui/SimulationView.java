@@ -11,8 +11,6 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 
-import org.apache.commons.math3.util.FastMath;
-
 import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
@@ -54,45 +52,8 @@ public class SimulationView extends Pane {
     static final Color INFO_TEXT = Color.BLACK;
   }
 
-  /** Wrapper for simulation state needed by the view. */
-  private static class ViewState {
-    private final EvolutionManager source;
-
-    private ViewState(EvolutionManager source) {
-      this.source = source;
-    }
-
-    public Iterable<Food> getFoods() {
-      return (Iterable<Food>) source.getFoods();
-    }
-
-    public Iterable<Bird> getBirds() {
-      return (Iterable<Bird>) source.getBirds();
-    }
-
-    public double getFoodSize() {
-      return source.getFoodSize();
-    }
-
-    public double getBirdSize() {
-      return source.getBirdSize();
-    }
-
-    public double getEyeFovAngle() {
-      return source.getEyeFovAngle();
-    }
-
-    public int getEyeCells() {
-      return source.getEyeCells();
-    }
-
-    public double getEyeFovRange() {
-      return source.getEyeFovRange();
-    }
-  }
-
-  /** The simulation state. */
-  private final ViewState state;
+  /** The simulation state to render; all values are read through it, never recomputed here. */
+  private final EvolutionManager state;
 
   private Runnable onHoveredBirdChanged;
 
@@ -126,7 +87,7 @@ public class SimulationView extends Pane {
    *     io.jshorelark.simulation.ui.SimulationApplication.EvolutionManagerWrapper} object
    */
   public SimulationView(EvolutionManager manager) {
-    this.state = new ViewState(manager);
+    this.state = java.util.Objects.requireNonNull(manager, "manager");
     this.canvas = new Canvas();
     getChildren().add(canvas);
 
@@ -395,8 +356,8 @@ public class SimulationView extends Pane {
       // 2. Negate the angle to change direction (CCW -> CW)
       double angle = fovStart + cellAngle * i;
       double screenAngle = -angle;
-      double x = FastMath.cos(screenAngle) * screenRange;
-      double y = FastMath.sin(screenAngle) * screenRange;
+      double x = Math.cos(screenAngle) * screenRange;
+      double y = Math.sin(screenAngle) * screenRange;
       gc.strokeLine(0, 0, x, y);
     }
 
