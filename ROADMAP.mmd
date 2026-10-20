@@ -1,0 +1,63 @@
+%% ROADMAP.mmd - JShorelark milestones.
+%% Render with any Mermaid tool, e.g. `npx -y @mermaid-js/mermaid-cli -i ROADMAP.mmd`.
+%% Companion prose: ROADMAP.md; open work: TO-DO.md.
+
+flowchart TD
+  classDef done fill:#2e7d32,stroke:#1b5e20,color:#ffffff
+  classDef active fill:#f9a825,stroke:#f57f17,color:#000000
+  classDef planned fill:#455a64,stroke:#263238,color:#ffffff
+  classDef gate fill:#1565c0,stroke:#0d47a1,color:#ffffff
+
+  rust["Rust reference<br/>libs/genetic-algorithm<br/>libs/neural-network<br/>libs/simulation<br/>libs/optimizer"]:::gate
+
+  subgraph m1["M1 - Faithful domain (done)"]
+    direction TB
+    ga["genetic-algorithm<br/>roulette / uniform / gaussian<br/>0.00001 fitness floor"]:::done
+    %% Extra strategies behind the same ports; not wired into Config on purpose.
+    gaextra["SinglePointCrossover<br/>TournamentSelection<br/>RandomResetMutation<br/>(available, not default)"]:::planned
+    nn["neural-network<br/>ReLU layers<br/>bias-first weight order"]:::done
+    sim["simulation<br/>toroidal world / segmented eye<br/>collisions -> brains -> movement -> evolve"]:::done
+    opt["optimizer<br/>grid search / JSONL / CSV"]:::done
+    ui["simulation-ui<br/>Canvas renderer / charts / audio"]:::done
+  end
+
+  subgraph m2["M2 - Fidelity hardening (active)"]
+    direction TB
+    e2e["Seeded end-to-end<br/>evolution test"]:::active
+    fixture["Rust run recorded<br/>as fixture"]:::planned
+    baseline["Documented learning<br/>baseline"]:::planned
+  end
+
+  subgraph m3["M3 - Reproducibility"]
+    direction TB
+    seed["--seed on simulate<br/>per-config Random"]:::planned
+    order["Deterministic CSV<br/>(TreeMap comparator)"]:::done
+  end
+
+  subgraph m4["M4 - CI and delivery"]
+    direction TB
+    ci["mvn verify on JDK 21"]:::done
+    matrix["Windows + Linux matrix"]:::done
+    docs["Javadoc + AsciiDoc"]:::planned
+  end
+
+  subgraph m5["M5 - Experience (adapter only)"]
+    direction TB
+    inspector["Split bird inspector<br/>out of SimulationView"]:::planned
+    i18n["Externalise UI strings"]:::planned
+    tanh["Optional TANH activation<br/>off by default"]:::planned
+  end
+
+  gates["Gates<br/>Spotless / Checkstyle<br/>PMD+CPD / SpotBugs / JaCoCo 80%"]:::gate
+
+  rust --> m1
+  ga --> gaextra
+  m1 --> m2
+  m2 --> m3
+  m3 --> m4
+  m4 --> m5
+  m1 --> gates
+  gates -.-> m2
+  gates -.-> m3
+  gates -.-> m4
+  gates -.-> m5

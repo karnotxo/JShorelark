@@ -246,7 +246,7 @@ public final class SimulationView extends Pane {
   /** Draws a food item. */
   private void drawFood(GraphicsContext gc, Food food) {
     gc.setFill(darkTheme ? DarkTheme.FOOD_COLOR : LightTheme.FOOD_COLOR);
-    Vector2D screenPos = worldToScreen(food.getPosition());
+    Vector2D screenPos = worldToScreen(food.position());
     double screenSize = getScreenFoodSize();
     gc.fillOval(
         screenPos.x() - screenSize / 2, screenPos.y() - screenSize / 2, screenSize, screenSize);

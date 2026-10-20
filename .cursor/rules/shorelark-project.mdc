@@ -147,8 +147,10 @@ mvn -B -ntp -pl optimizer exec:java -Dexec.args="simulate -o results.jsonl"
   with `rotation * Vector2::new(0.0, speed)`. Java stores a plain `float rotation` and must convert
   consistently in exactly one place. Do not scatter `±π/2` offsets across renderer and physics.
 - **Angle to food.** Rust uses `Rotation2::rotation_between(&Vector2::y(), &vec).angle()`, i.e. the
-  angle is measured from the +Y axis. `atan2(vec.x, vec.y)` reproduces it; `atan2(vec.y, vec.x)`
-  does not.
+  angle is measured from the +Y axis, counter-clockwise positive. `atan2(-vec.x, vec.y)` reproduces
+  it: nalgebra computes `atan2(y.perp(vec), y.dot(vec))` and the 2D cross product is `-vec.x`.
+  `atan2(vec.x, vec.y)` mirrors the field of view (left/right swapped); `atan2(vec.y, vec.x)`
+  rotates the whole fan by 90°.
 - **Collision radius.** Rust compares `distance <= config.food_size` only.
 - **Generation trigger.** Rust counts `age` steps and evolves when `age > sim_generation_length`;
   satiation is the *fitness*, never the clock.

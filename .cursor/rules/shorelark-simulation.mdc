@@ -35,11 +35,17 @@ Meaning: **rotation 0 points along +Y**, positive rotation is counter-clockwise.
 - One conversion point only. If the renderer needs a screen angle, compute it in the renderer
   (`Math.toDegrees(rotation) - 90` for JavaFX Canvas, whose 0° is +X and whose positive direction is
   clockwise).
-- Normalise rotation into `[0, 2π)` when storing it, and wrap the *difference* when comparing
-  angles.
-- Angle to a food item is measured from +Y: `atan2(vec.x(), vec.y())`. This mirrors
-  `Rotation2::rotation_between(&Vector2::y(), &vec)`. Using `atan2(vec.y(), vec.x())` rotates the
-  whole vision fan by 90° and silently breaks learning.
+- Keep the stored rotation as Rust does: `Bird::process_movement` accumulates deltas and wraps the
+  result into `[-π, π]`; it does **not** re-encode it into `[0, 2π)`. Wrap the *difference* when
+  comparing angles.
+- Angle to a food item is measured from +Y, counter-clockwise positive: `atan2(-vec.x(), vec.y())`.
+  This mirrors `Rotation2::rotation_between(&Vector2::y(), &vec)`, which nalgebra defines as
+  `atan2(y.perp(vec), y.dot(vec))`; for 2D that cross product is `-vec.x`. Dropping the minus sign
+  mirrors the field of view and is a real bug (`BirdEyeTest.ReferenceGrids` catches it), while using
+  `atan2(vec.y(), vec.x())` rotates the whole fan by 90° instead of mirroring it.
+- Read a stored heading back the way `Rotation2::angle()` does — `atan2(sin r, cos r)` — and wrap
+  with nalgebra's strict `wrap` (shift by whole periods while strictly outside `[-π, π]`), never a
+  modulo normalisation. Those two details decide how food exactly on the ±π boundary is binned.
 
 ## Bird lifecycle
 

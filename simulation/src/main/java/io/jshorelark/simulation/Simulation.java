@@ -207,13 +207,17 @@ public final class Simulation {
    */
   private void processCollisions(Random random) {
     float foodSize = config.foodSize();
+    List<Food> foods = world.getFoods();
     for (Bird bird : world.getBirds()) {
-      for (Food food : world.getFoods()) {
-        float distance = bird.getPosition().distance(food.getPosition());
+      // Indexed rather than for-each: an eaten item is replaced in place, exactly as Rust mutates
+      // `food.position`, and the slot must survive the swap.
+      for (int i = 0; i < foods.size(); i++) {
+        Food food = foods.get(i);
+        float distance = bird.getPosition().distance(food.position());
         if (distance <= foodSize) {
           bird.eat();
-          world.respawnFood(food, Food.random(random));
           collisionListener.onCollision(CollisionEvent.create(bird, food, distance));
+          world.replaceFood(i, Food.random(random));
         }
       }
     }

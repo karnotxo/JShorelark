@@ -46,6 +46,6 @@ public record CollisionEvent(
    */
   public static CollisionEvent create(Bird bird, Food food, float distance) {
     return new CollisionEvent(
-        bird.getPosition(), bird.getRotation(), bird.getSatiation(), food.getPosition(), distance);
+        bird.getPosition(), bird.getRotation(), bird.getSatiation(), food.position(), distance);
   }
 }

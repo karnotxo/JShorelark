@@ -1,198 +1,58 @@
-name: JShorelark CI
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
-  schedule:
-    - cron: '0 0 * * 0'  # Run weekly for security scans
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push to the same ref cancels the previous run; verifying a stale commit is wasted CPU.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  verify:
+    name: Verify on JDK ${{ matrix.java }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Report every platform, do not stop at the first failure.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        java: ['21']
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: maven
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: temurin
+          cache: maven
 
-    - name: Build with Maven
-      run: mvn -B package --file pom.xml
+      # `verify` is the whole gate: Spotless, Checkstyle and the enforcer run at `validate`,
+      # JaCoCo and SpotBugs at `verify`, PMD/CPD at `verify`. Running the phases separately would
+      # duplicate work without adding coverage.
+      - name: Build and verify
+        run: mvn -B -ntp verify
 
-    - name: Run tests
-      run: mvn test
-
-    - name: Check code style
-      run: mvn spotless:check
-
-    - name: Run Checkstyle
-      run: mvn checkstyle:check
-
-    - name: Cache SonarCloud packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.sonar/cache
-        key: ${{ runner.os }}-sonar
-        restore-keys: ${{ runner.os }}-sonar
-
-    - name: SonarCloud Analysis
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: mvn verify sonar:sonar -Dsonar.projectKey=your-project-key -Dsonar.organization=your-org -Dsonar.host.url=https://sonarcloud.io
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: build-artifacts
-        path: |
-          **/target/*.jar
-          **/target/site/
-        retention-days: 5
-
-  security:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: OWASP Dependency Check
-      uses: dependency-check/Dependency-Check_Action@main
-      env:
-        JAVA_HOME: ${{ env.JAVA_HOME }}
-      with:
-        project: 'JShorelark'
-        path: '.'
-        format: 'HTML'
-        args: >
-          --failOnCVSS 7
-          --enableRetired
-
-    - name: Upload dependency check report
-      uses: actions/upload-artifact@v3
-      with:
-        name: dependency-check-report
-        path: reports
-
-    - name: Snyk Security Scan
-      uses: snyk/actions/maven@master
-      env:
-        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --severity-threshold=high
-
-  performance:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Run JMH Benchmarks
-      run: mvn verify -P benchmark
-
-    - name: Run Load Tests
-      run: |
-        mvn verify -P performance-tests
-        mkdir -p performance-reports
-        cp target/jmeter/results/* performance-reports/
-
-    - name: Upload Performance Results
-      uses: actions/upload-artifact@v3
-      with:
-        name: performance-results
-        path: performance-reports
-
-  javadoc:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Generate Javadoc
-      run: mvn javadoc:javadoc
-
-    - name: Deploy Javadoc
-      if: github.ref == 'refs/heads/main'
-      uses: JamesIves/github-pages-deploy-action@v4
-      with:
-        folder: target/site/apidocs
-        branch: gh-pages
-        clean: true
-        target-folder: javadoc
-
-  asciidoc:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Generate AsciiDoc Documentation
-      run: mvn generate-resources
-
-    - name: Deploy Documentation
-      if: github.ref == 'refs/heads/main'
-      uses: JamesIves/github-pages-deploy-action@v4
-      with:
-        folder: target/generated-docs
-        branch: gh-pages
-        clean: false
-        target-folder: docs
-
-  dependency-updates:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Check for dependency updates
-      run: mvn versions:display-dependency-updates versions:display-plugin-updates
-
-    - name: Generate dependency report
-      run: mvn project-info-reports:dependencies
-
-    - name: Upload dependency report
-      uses: actions/upload-artifact@v3
-      with:
-        name: dependency-reports
-        path: target/site/dependencies.html
+      # Reports only exist when a gate failed, which is exactly when they are needed.
+      - name: Upload quality reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports-${{ matrix.os }}-jdk${{ matrix.java }}
+          path: |
+            **/target/checkstyle-result.xml
+            **/target/pmd.xml
+            **/target/cpd.xml
+            **/target/spotbugsXml.xml
+            **/target/surefire-reports/**
+            **/target/site/jacoco/**
+          if-no-files-found: ignore
+          retention-days: 7

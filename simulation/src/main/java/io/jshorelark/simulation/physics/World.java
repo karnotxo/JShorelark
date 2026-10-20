@@ -121,16 +121,15 @@ public final class World {
   /**
    * Replaces a consumed food item in place, keeping the food count constant.
    *
-   * <p>Mirrors Rust's {@code food.position = rng.gen()}: the item is repositioned, not removed.
+   * <p>Mirrors Rust's {@code food.position = rng.gen()}: the item is repositioned, not removed. The
+   * slot is addressed by index because {@link Food} equality is positional, so an {@code indexOf}
+   * lookup could pick the wrong item when two food items share a position.
    *
-   * @param consumed the item that was eaten
+   * @param index the slot of the eaten item
    * @param replacement the item that takes its slot
+   * @throws IndexOutOfBoundsException if {@code index} is not a valid food slot
    */
-  public void respawnFood(Food consumed, Food replacement) {
-    int index = foods.indexOf(consumed);
-    if (index < 0) {
-      throw new IllegalArgumentException("Food item does not belong to this world: " + consumed);
-    }
+  public void replaceFood(int index, Food replacement) {
     foods.set(index, Objects.requireNonNull(replacement, "replacement"));
   }
 

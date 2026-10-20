@@ -7,24 +7,23 @@
 package io.jshorelark.simulation.food;
 
 import io.jshorelark.simulation.physics.Vector2D;
+import java.util.Objects;
 import java.util.Random;
-import lombok.Value;
-import lombok.With;
 
 /**
- * Represents food in the simulation.
+ * A food item: a position and nothing else.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Mirrors Rust's {@code Food}, which is a single {@code Point2}. When a bird eats, the item is
+ * repositioned rather than removed, so a food item carries no "consumed" state.
+ *
+ * @param position the position in world coordinates
  */
-@Value
-@With
-public class Food {
-  /** The food's position. */
-  Vector2D position;
+public record Food(Vector2D position) {
 
-  /** Whether this food has been consumed. */
-  boolean consumed;
+  /** Validates the position. */
+  public Food {
+    Objects.requireNonNull(position, "position");
+  }
 
   /**
    * Creates food at the given position.
@@ -33,7 +32,7 @@ public class Food {
    * @return the food
    */
   public static Food at(Vector2D position) {
-    return new Food(position, false);
+    return new Food(position);
   }
 
   /**

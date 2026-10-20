@@ -176,7 +176,11 @@ public final class Bird {
   /**
    * Returns the current heading.
    *
-   * @return the rotation in radians, {@code [0, 2π)}, {@code 0} facing +Y
+   * <p>Rust stores a {@code Rotation2} and reports {@code angle()}, so the value is always in
+   * {@code [-π, π]} with {@code 0} facing +Y; this field follows the same convention.
+   *
+   * @return the rotation in radians, {@code [-π, π]}, {@code 0} facing +Y, counter-clockwise
+   *     positive
    */
   public float getRotation() {
     return rotation;
@@ -239,12 +243,21 @@ public final class Bird {
   /**
    * Normalises an angle into {@code [0, 2π)}.
    *
-   * <p>Rust stores the heading as a {@code Rotation2}, which is periodic by construction. Java
-   * keeps a plain float, so the normalisation has to happen explicitly, here and nowhere else.
+   * <p>Rust stores the heading as a {@code Rotation2}, which is periodic by construction; Java
+   * keeps a plain float, so the wrap has to happen explicitly, here and nowhere else. The target
+   * range is {@code [-π, π]} because that is what {@code Rotation2::angle()} reports, and keeping
+   * it makes the vision binning agree with the reference at the boundary.
    */
   private static float normalizeAngle(float angle) {
+    float pi = (float) Math.PI;
     float twoPi = (float) (2 * Math.PI);
-    float normalized = angle % twoPi;
-    return normalized < 0.0f ? normalized + twoPi : normalized;
+    float wrapped = angle;
+    while (wrapped < -pi) {
+      wrapped += twoPi;
+    }
+    while (wrapped > pi) {
+      wrapped -= twoPi;
+    }
+    return wrapped;
   }
 }
