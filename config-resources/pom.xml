@@ -1,39 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>io.jshorelark</groupId>
-  <artifactId>config-resources</artifactId>
-  <name>JShorelark ConfigResources</name>
-  <version>1.0-SNAPSHOT</version>
+  <parent>
+    <groupId>io.jshorelark</groupId>
+    <artifactId>jshorelark-parent</artifactId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
 
-  <properties>
-    <spotless.maven.plugin.version>2.43.0</spotless.maven.plugin.version>
-  </properties>
+  <artifactId>config-resources</artifactId>
+  <packaging>jar</packaging>
+  <name>JShorelark Config Resources</name>
+  <description>Shared Checkstyle, PMD and Log4j2 resources for every module</description>
 
   <build>
-    <plugins>
-      <plugin>
-        <groupId>com.diffplug.spotless</groupId>
-        <artifactId>spotless-maven-plugin</artifactId>
-        <version>${spotless.maven.plugin.version}</version>
-        <executions>
-          <execution>
-            <id>spotless-check</id>
-            <phase>validate</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-    </plugins>
-    <resources>
-      <resource>
-        <directory>src/main/resources</directory>
-      </resource>
-    </resources>
+    <!--
+      Resources only: the jar is consumed by the quality plugins (Checkstyle/PMD) and by the
+      logging configuration at runtime. No Java sources belong here.
+    -->
   </build>
 </project>

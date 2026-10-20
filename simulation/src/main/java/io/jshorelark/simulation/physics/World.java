@@ -2,7 +2,7 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.physics;
 
@@ -16,73 +16,79 @@ import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.food.Food;
 
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Getter;
-
 /**
- * Represents the simulation world containing birds and food.
+ * The container that holds everything that exists in a simulation: birds and food.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Mirrors Rust's {@code World}. It is deliberately a plain mutable holder — the simulation owns
+ * the rules, the world only stores the entities. Lists are exposed as unmodifiable views so callers
+ * cannot bypass the mutation methods.
  */
-@Getter
-@Builder(toBuilder = true)
-public class World {
-  /** The birds in this world. */
-  @Getter(AccessLevel.NONE)
-  @Builder.Default
+public final class World {
+
   private final List<Bird> birds = new ArrayList<>();
-
-  /** The food in this world. */
-  @Getter(AccessLevel.NONE)
-  @Builder.Default
   private final List<Food> foods = new ArrayList<>();
-
-  /** The configuration for this world. */
   private final Config config;
 
+  private World(Config config) {
+    this.config = config;
+  }
+
   /**
-   * Creates a new random world.
+   * Creates a world populated with the configured number of random birds and food items.
    *
-   * @param config the configuration
-   * @param random the random number generator
-   * @return the world
+   * @param config the simulation configuration
+   * @param random the random source
+   * @return a fully populated world
    */
   public static World random(Config config, Random random) {
-    World world = builder().config(config).build();
-
-    // Add initial birds
+    Objects.requireNonNull(config, "config");
+    Objects.requireNonNull(random, "random");
+    var world = new World(config);
     for (int i = 0; i < config.getWorldAnimals(); i++) {
       world.birds.add(Bird.random(config, random));
     }
-
-    // Add initial food
     for (int i = 0; i < config.getWorldFoods(); i++) {
       world.foods.add(Food.random(random));
     }
-
     return world;
   }
 
   /**
-   * Sets the food list.
+   * Creates an empty world.
    *
-   * @param newFoods the new food list
+   * @param config the simulation configuration
+   * @return a world with no birds and no food
    */
-  public void setFoods(List<Food> newFoods) {
-    foods.clear();
-    foods.addAll(newFoods);
+  public static World empty(Config config) {
+    return new World(Objects.requireNonNull(config, "config"));
   }
 
-  /** Clears all birds. */
-  public void clearBirds() {
-    birds.clear();
+  /**
+   * Returns the configuration this world belongs to.
+   *
+   * @return the configuration
+   */
+  public Config getConfig() {
+    return config;
   }
 
-  /** Clears all food. */
-  public void clearFoods() {
-    foods.clear();
+  /**
+   * Returns the birds, in insertion order.
+   *
+   * @return an unmodifiable view of the population
+   */
+  public List<Bird> getBirds() {
+    // A read-only view, not a copy: this is read on every step and by every render frame.
+    return Collections.unmodifiableList(birds);
+  }
+
+  /**
+   * Returns the food items, in insertion order.
+   *
+   * @return an unmodifiable view of the food list
+   */
+  public List<Food> getFoods() {
+    return Collections.unmodifiableList(foods);
   }
 
   /**
@@ -91,7 +97,7 @@ public class World {
    * @param bird the bird to add
    */
   public void addBird(Bird bird) {
-    birds.add(bird);
+    birds.add(Objects.requireNonNull(bird, "bird"));
   }
 
   /**
@@ -100,39 +106,41 @@ public class World {
    * @param food the food to add
    */
   public void addFood(Food food) {
-    foods.add(food);
+    foods.add(Objects.requireNonNull(food, "food"));
+  }
+
+  /** Removes every bird. */
+  public void clearBirds() {
+    birds.clear();
+  }
+
+  /** Removes every food item. */
+  public void clearFoods() {
+    foods.clear();
   }
 
   /**
-   * Gets an unmodifiable view of the birds in this world.
+   * Replaces a consumed food item in place, keeping the food count constant.
    *
-   * @return a {@link java.util.List} object
+   * <p>Mirrors Rust's {@code food.position = rng.gen()}: the item is repositioned, not removed.
+   *
+   * @param consumed the item that was eaten
+   * @param replacement the item that takes its slot
    */
-  public List<Bird> getBirds() {
-    return Collections.unmodifiableList(birds);
+  public void respawnFood(Food consumed, Food replacement) {
+    int index = foods.indexOf(consumed);
+    if (index < 0) {
+      throw new IllegalArgumentException("Food item does not belong to this world: " + consumed);
+    }
+    foods.set(index, Objects.requireNonNull(replacement, "replacement"));
   }
 
   /**
-   * Gets an unmodifiable view of the food in this world.
+   * Moves every food item to a new random position.
    *
-   * @return a {@link java.util.List} object
+   * @param random the random source
    */
-  public List<Food> getFoods() {
-    return Collections.unmodifiableList(foods);
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) return true;
-    if (!(o instanceof World)) return false;
-    World world = (World) o;
-    return birds.equals(world.birds)
-        && foods.equals(world.foods)
-        && Objects.equals(config, world.config);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(birds, foods, config);
+  public void randomizeFoods(Random random) {
+    foods.replaceAll(ignored -> Food.random(random));
   }
 }

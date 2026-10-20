@@ -2,72 +2,163 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation;
 
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
 
+import io.jshorelark.genetic.GeneticAlgorithm;
+import io.jshorelark.genetic.crossover.UniformCrossover;
+import io.jshorelark.genetic.mutation.GaussianMutation;
+import io.jshorelark.genetic.selection.RouletteWheelSelection;
 import io.jshorelark.simulation.bird.Bird;
+import io.jshorelark.simulation.bird.BirdIndividual;
 import io.jshorelark.simulation.events.CollisionEvent;
+import io.jshorelark.simulation.events.CollisionListener;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.World;
 
-import lombok.Getter;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
-
 /**
- * Core simulation that manages the world state. Matches Rust's wsm::Simulation.
+ * One simulation run: a world plus the step clock that drives it.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Mirrors the Rust {@code Simulation} in {@code libs/simulation/src/lib.rs}: each {@link #step}
+ * processes collisions, runs every brain, moves every bird, and finally checks whether the
+ * generation is over. When it is, a new generation is evolved and its statistics are returned.
+ *
+ * <p>This type owns the only mutable simulation state and knows nothing about rendering, files or
+ * threading.
  */
-public class Simulation {
+public final class Simulation {
+
   /** The simulation configuration. */
-  @Getter private final Config config;
+  private final Config config;
 
   /** The world being simulated. */
   private final World world;
 
-  /** Sink for collision events. */
-  private final Sinks.Many<CollisionEvent> collisionSink;
+  /** Observer for food consumption; never null. */
+  private final CollisionListener collisionListener;
+
+  /** Steps elapsed in the current generation. */
+  private int age;
+
+  /** Generations completed so far. */
+  private int generation;
 
   /**
-   * Creates a new simulation with the given config.
+   * Creates a simulation with a randomly generated world.
    *
-   * @param config a {@link io.jshorelark.simulation.Config} object
-   * @param random a {@link java.util.Random} object
+   * @param config the simulation configuration
+   * @param random the random source used for spawning and food respawns
+   * @param collisionListener observer notified on every food consumption
+   * @throws IllegalArgumentException if {@code config} or {@code random} is null
    */
-  public Simulation(Config config, Random random) {
-    this.config = config;
-    this.world = World.random(config, random);
-    this.collisionSink = Sinks.many().multicast().onBackpressureBuffer();
+  public Simulation(Config config, Random random, CollisionListener collisionListener) {
+    this.config = Objects.requireNonNull(config, "config");
+    this.world = World.random(config, Objects.requireNonNull(random, "random"));
+    this.collisionListener = Objects.requireNonNull(collisionListener, "collisionListener");
   }
 
   /**
-   * Gets an unmodifiable view of the birds in this world.
+   * Creates a simulation that ignores consumption events.
    *
-   * @return a {@link java.util.List} object
+   * @param config the simulation configuration
+   * @param random the random source used for spawning and food respawns
+   */
+  public Simulation(Config config, Random random) {
+    this(config, random, CollisionListener.NONE);
+  }
+
+  /**
+   * Returns the configuration this simulation was created with.
+   *
+   * @return the immutable configuration
+   */
+  public Config getConfig() {
+    return config;
+  }
+
+  /**
+   * Returns an unmodifiable view of the birds in the world.
+   *
+   * @return the current population
    */
   public List<Bird> getBirds() {
     return world.getBirds();
   }
 
   /**
-   * Gets an unmodifiable view of the food in this world.
+   * Returns an unmodifiable view of the food items in the world.
    *
-   * @return a {@link java.util.List} object
+   * @return the current food list
    */
   public List<Food> getFoods() {
     return world.getFoods();
   }
 
   /**
-   * Adds food items to the world.
+   * Returns the number of steps elapsed in the current generation.
    *
-   * @param count a int
-   * @param random a {@link java.util.Random} object
+   * @return the current age, in simulation steps
+   */
+  public int getAge() {
+    return age;
+  }
+
+  /**
+   * Returns the number of generations completed so far.
+   *
+   * @return the completed generation count
+   */
+  public int getGeneration() {
+    return generation;
+  }
+
+  /**
+   * Advances the simulation by one step.
+   *
+   * <p>The order is part of the behaviour and must not change: collisions, then brains, then
+   * movements, then the generation check.
+   *
+   * @param random the random source used to respawn consumed food
+   * @return the statistics of the generation that just ended, or {@code null} if it is still running
+   */
+  public Statistics step(Random random) {
+    processCollisions(random);
+    processBrains();
+    processMovements();
+    return tryEvolving(random);
+  }
+
+  /**
+   * Runs the simulation until a generation completes.
+   *
+   * <p>Mirrors Rust's {@code Simulation::train}.
+   *
+   * @param random the random source
+   * @return the statistics of the completed generation
+   * @throws IllegalStateException if the world has no birds, since no generation can complete
+   */
+  public Statistics train(Random random) {
+    if (world.getBirds().isEmpty()) {
+      throw new IllegalStateException("Cannot train an empty population");
+    }
+    while (true) {
+      Statistics statistics = step(random);
+      if (statistics != null) {
+        return statistics;
+      }
+    }
+  }
+
+  /**
+   * Adds food items at random positions.
+   *
+   * @param count how many items to add
+   * @param random the random source
    */
   public void addFoods(int count, Random random) {
     for (int i = 0; i < count; i++) {
@@ -76,89 +167,101 @@ public class Simulation {
   }
 
   /**
-   * Updates the simulation state.
+   * Adds a bird to the world.
    *
-   * @param random a {@link java.util.Random} object
+   * @param bird the bird to add
    */
-  public void update(Random random) {
-    processCollisions(random);
-    processBrains();
-    processMovements();
+  public void addBird(Bird bird) {
+    world.addBird(bird);
   }
 
-  /** Processes collisions between birds and food. */
+  /** Removes every bird from the world. */
+  public void clearBirds() {
+    world.clearBirds();
+  }
+
+  /** Removes every food item from the world. */
+  public void clearFoods() {
+    world.clearFoods();
+  }
+
+  /**
+   * Feeds every bird that is close enough to a food item.
+   *
+   * <p>Mirrors Rust's {@code process_collisions}: the radius is {@link Config#getFoodSize()} and
+   * nothing else, a consumed item is repositioned rather than removed, and the loop is bird-major so
+   * several birds may eat the same item in the same step.
+   */
   private void processCollisions(Random random) {
-    List<Food> newFoods = new ArrayList<>();
-    for (Food food : world.getFoods()) {
-      boolean wasConsumed = false;
-      for (Bird bird : world.getBirds()) {
+    float foodSize = config.getFoodSize();
+    for (Bird bird : world.getBirds()) {
+      for (Food food : world.getFoods()) {
         float distance = bird.getPosition().distance(food.getPosition());
-        float collisionThreshold = config.getBirdSize() + config.getFoodSize();
-        if (distance <= collisionThreshold) {
+        if (distance <= foodSize) {
           bird.eat();
-          wasConsumed = true;
-          // Emit collision event
-          onCollision(CollisionEvent.create(bird, food, distance));
-          break;
+          world.respawnFood(food, Food.random(random));
+          collisionListener.onCollision(CollisionEvent.create(bird, food, distance));
         }
       }
-      if (wasConsumed) {
-        // Replace consumed food with new food at random position
-        newFoods.add(Food.random(random));
-      } else {
-        newFoods.add(food);
-      }
     }
-    world.setFoods(newFoods);
   }
 
-  /** Processes bird brains. */
+  /** Runs every bird's brain, which refreshes its vision and its controls. */
   private void processBrains() {
     for (Bird bird : world.getBirds()) {
       bird.processBrain(world.getFoods(), config);
     }
   }
 
-  /** Processes bird movements. */
+  /** Moves every bird according to its current speed and rotation. */
   private void processMovements() {
     for (Bird bird : world.getBirds()) {
       bird.processMovement();
     }
   }
 
-  /** Clears all birds from the world. */
-  public void clearBirds() {
-    world.clearBirds();
-  }
-
-  /** Clears all foods from the world. */
-  public void clearFoods() {
-    world.clearFoods();
+  /**
+   * Counts the step and evolves the population when the generation length is reached.
+   *
+   * <p>Mirrors Rust's {@code try_evolving}, which increments the age first and evolves on
+   * {@code age > sim_generation_length}.
+   */
+  private Statistics tryEvolving(Random random) {
+    age++;
+    if (age <= config.getSimGenerationLength()) {
+      return null;
+    }
+    return evolve(random);
   }
 
   /**
-   * Adds a bird to the world.
+   * Replaces the population with the offspring of the fittest birds.
    *
-   * @param bird a {@link io.jshorelark.simulation.bird.Bird} object
+   * <p>Mirrors Rust's {@code evolve}: reset the clock, build one individual per bird, optionally
+   * reverse the fitness, evolve, rebuild the population from the new chromosomes and reposition
+   * every food item. The reported statistics belong to the generation that just ended, hence
+   * {@code generation - 1}.
    */
-  public void addBird(Bird bird) {
-    world.addBird(bird);
-  }
+  private Statistics evolve(Random random) {
+    age = 0;
+    generation++;
 
-  /** Steps the simulation forward one tick. */
-  public void step() {
-    processCollisions(new Random());
-    processBrains();
-    processMovements();
-  }
+    var algorithm =
+        GeneticAlgorithm.create(
+            new RouletteWheelSelection(),
+            new UniformCrossover(),
+            GaussianMutation.create(config.getGaMutChance(), config.getGaMutCoeff()),
+            new BirdIndividual.Factory(config));
 
-  /** Handles a collision event. */
-  private void onCollision(CollisionEvent event) {
-    collisionSink.tryEmitNext(event);
-  }
+    List<BirdIndividual> individuals = world.getBirds().stream().map(BirdIndividual::of).toList();
+    var result = algorithm.evolve(random, individuals);
 
-  /** Gets an unmodifiable view of the collision events. */
-  public Flux<CollisionEvent> getCollisionEvents() {
-    return collisionSink.asFlux();
+    world.clearBirds();
+    for (BirdIndividual individual : result.getFirst()) {
+      world.addBird(individual.toBird(random));
+    }
+    world.randomizeFoods(random);
+
+    return new Statistics(generation - 1, result.getSecond());
   }
 }

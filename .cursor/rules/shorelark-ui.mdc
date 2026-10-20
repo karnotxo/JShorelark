@@ -1,0 +1,92 @@
+---
+description: JavaFX adapter - application lifecycle, Canvas rendering, animation loop, controls, charts, audio
+globs: simulation-ui/**/*.java
+alwaysApply: false
+---
+
+# JavaFX Adapter (`simulation-ui`)
+
+This module is an **adapter**: it owns JavaFX, the animation loop, pixels, sound and user input. It
+observes the domain and must never encode simulation rules.
+
+## Responsibilities
+
+| Class | Responsibility |
+|---|---|
+| `SimulationApplication` | JavaFX `Application`, scene wiring, menu/controls, animation loop, sound subscription |
+| `SimulationView` | `Canvas` painting of birds, food, field-of-view, hover info |
+| `SimulationControls` | Buttons/sliders for speed, pause, reset, theme |
+| `FitnessChart` | Fitness-per-generation line chart |
+| `evolution.EvolutionManager` | Bridge between `Simulation` and the UI: owns the generation counter and hands statistics to the chart |
+| `audio.SoundManager` | Playing short SFX (no domain knowledge) |
+| `SplashScreen`, `AboutDialog` | Static, non-simulating UI |
+| `icons.AppIcon`, `icons.SvgIcons` | Vector icon construction |
+
+## Threading rules
+
+- All JavaFX scene graph mutation happens on the **FX Application Thread**.
+- The simulation is stepped by JavaFX `AnimationTimer` (or `Timeline`) on the FX thread; extra
+  threads are only for genuinely blocking work.
+- `Platform.runLater` is the only bridge from a background thread into the UI.
+- Never call `Thread.sleep` in the animation loop; throttle by skipping frames or by accumulating
+  elapsed time.
+- Collision sounds are triggered from the domain's collision notifications, always marshalled onto
+  the FX thread before touching UI state.
+
+## Rendering rules
+
+- Rendering is **read-only**: `SimulationView#draw` may read birds, food and config; it must not
+  advance the simulation, mutate a bird, or spawn food.
+- Model space is the unit square with Y up; screen space is pixels with Y down. The conversion lives
+  in exactly one pair of helpers (`worldToScreen` / `screenToWorld`) and nowhere else.
+- Canvas rotation: JavaFX `GraphicsContext#rotate` treats 0° as +X and positive as clockwise, while
+  the domain uses 0 = +Y and CCW. Use `Math.toDegrees(rotation) - 90` once, in one place, and keep
+  the FOV fan consistent with it.
+- Sizes (`birdSize`, `foodSize`, `eyeFovRange`) are world units; scale them by the same
+  `Math.min(canvasWidth, canvasHeight)` factor the position conversion uses, otherwise the drawing
+  drifts from the physics as the window resizes.
+- Use `gc.save()` / `gc.restore()` around any transform block so state cannot leak between birds.
+- Theme colours live in small theme holders, not as literal colours scattered through draw methods.
+- Redraw at the animation cadence; do not allocate per-frame objects where a reusable value would
+  do (this runs 60 times a second with 40 birds and 60 food items).
+
+## EvolutionManager
+
+- It is the *only* UI-side owner of the generation counter and of the statistics hand-off.
+- It must not decide when a generation ends: `Simulation#step` returns the statistics, and the
+  manager reacts to that signal. If the manager duplicates the tick-counting rule, the rule now has
+  two sources of truth.
+- Reset behaviour (new random world, generation 0, cleared chart) belongs here so every control
+  triggers the same path.
+- Panel-handy accessors (`getFoods()`, `getBirdSize()`, …) are delegation, not computation.
+
+## Controls and charts
+
+- Controls mutate `EvolutionManager` only; they never reach into `Bird` objects.
+- Validate input at the UI boundary (slider ranges, numeric fields) and surface a friendly message
+  instead of letting an exception escape the handler.
+- `FitnessChart` receives an immutable statistics snapshot per generation; it keeps its own series
+  history and does not read the simulation.
+- Keyboard shortcuts are registered once, in the application, and documented in the About dialog.
+
+## Sound
+
+- `SoundManager` is fire-and-forget: load on startup, fail soft (log a warning) if a clip is
+  missing, never block the FX thread on media loading.
+- No domain imports in `SoundManager`; it takes plain events/flags from the application.
+
+## Layout and styling
+
+- Build layouts in code only when FXML is not already used; do not mix both styles in one screen.
+- Inline CSS is acceptable for a prototype but must not carry behaviour.
+- Keep strings user-facing and easy to externalise; no concatenation that cannot be translated.
+- Respect the current theme for every new widget (dark and light must both stay readable).
+
+## Anti-patterns
+
+- Simulation logic (movement, eating, generation checks) inside a view or controller.
+- Reading/mutating the world from a render method to make it look right.
+- A second copy of `worldToScreen` in a chart or dialog.
+- Blocking the FX thread with file I/O, `Thread.sleep`, or synchronous media loads.
+- Recomputing fitness statistics in the UI instead of consuming the domain snapshot.
+- Catching `Exception` and swallowing it in an event handler.

@@ -1,0 +1,143 @@
+---
+description: Java 21 language and API usage - records, sealed types, pattern matching, Math.clamp, Sequenced Collections
+globs: **/*.java
+alwaysApply: false
+---
+
+# Java 21 - Language and API Usage
+
+The project targets **JDK 21** (`maven.compiler.release=21`). Use the newest **final** language
+features; never enable preview features. Everything below is standard in 21.
+
+## Records
+
+Use a record whenever the type is a transparent, immutable carrier of data.
+
+```java
+public record Chromosome(float[] genes) {
+  public Chromosome {
+    genes = genes.clone(); // defensive copy; arrays are mutable
+  }
+
+  @Override
+  public float[] genes() {
+    return genes.clone(); // never leak the internal array
+  }
+}
+```
+
+Rules:
+
+- Compact canonical constructors for validation and defensive copies.
+- Never expose a mutable array or collection directly; clone on the way in and on the way out, or
+  wrap with `List.copyOf` / `Map.copyOf` / `Set.copyOf`.
+- Records are `final` and implicitly extend `java.lang.Record`; they cannot extend a class. Compose
+  instead.
+- A record with a state machine or identity (the `Bird` in a live simulation) is usually **not** a
+  record: keep it a class and make the *snapshots* records (`CollisionEvent`, `Statistics`).
+- `@RecordBuilder` is the approved way to get a builder or `with…` methods for a record that needs
+  Jackson deserialisation or fluent copies. Do not hand-write a builder for a record.
+
+## Sealed hierarchies
+
+Use `sealed` when the set of subtypes is genuinely closed and the compiler should enumerate them.
+
+```java
+public sealed interface BrainOutput permits SpeedAdjustment, RotationAdjustment {}
+```
+
+- Every permitted subtype is `final`, `sealed` or `non-sealed`; state which and why if it is not
+  `final`.
+- Prefer a sealed interface over an enum when the cases carry different data; prefer an enum when
+  they do not.
+- Do not seal a type only to "document intent"; seal it when it buys exhaustive `switch`.
+
+## Pattern matching and `switch`
+
+```java
+String describe(Individual individual) {
+  return switch (individual) {
+    case BirdIndividual bird -> "bird " + bird.getFitness();
+    case NeuralNetworkIndividual network -> "network " + network.getFitness();
+    default -> "unknown";
+  };
+}
+```
+
+- Pattern-matching `switch` over a sealed hierarchy needs no `default`; let the compiler tell you
+  when a subtype is added.
+- Record patterns deconstruct without accessor noise: `case CollisionEvent(Vector2D position, var rest)`.
+- Use `instanceof` patterns (`if (obj instanceof Bird bird)`), never a cast after a check.
+- Guarded patterns (`when`) are final in 21 — use them instead of a nested `if` inside a case.
+
+## `Math.clamp` and numeric hygiene
+
+`Math.clamp(value, min, max)` exists for `int`, `long`, `double` and `float` in 21. Replace every
+nested `Math.min(max, Math.max(min, x))`.
+
+```java
+speed = Math.clamp(speed + adjustment, config.getSimSpeedMin(), config.getSimSpeedMax());
+```
+
+- The Rust `f32::clamp` panics when `min > max`; Java throws `IllegalArgumentException`. Keep the
+  same contract and let it throw rather than silently returning garbage.
+- Simulation state is `float` (matching Rust `f32`). Do not mix `double` maths into per-tick hot
+  paths without converting back explicitly: a silent widening changes rounding and breaks golden
+  tests.
+- Distance comparisons use the squared distance (`Vector2D#distanceSquared`) unless the actual
+  distance is needed; this avoids a `sqrt` per bird per food per tick.
+
+## Sequenced Collections
+
+`List`, `Deque` and `SortedSet` implement `SequencedCollection` in 21.
+
+- `list.getFirst()` / `list.getLast()` instead of `list.get(0)` / `list.get(list.size() - 1)`.
+- `list.reversed()` for a read-only reverse view instead of copying.
+- `SequencedMap` (`putFirst`, `putLast`, `firstEntry`) for ordered maps.
+
+## `var`, text blocks, `instanceof`
+
+- `var` for locals when the right-hand side makes the type obvious (`var birds = world.getBirds()`).
+  Never for fields, method parameters, or a right-hand side that hides an important type.
+- Text blocks for JSON, SQL and multi-line log formats; `formatted(...)` for interpolation.
+- `switch` expressions for pure mappings; `switch` statements for side effects.
+
+## Streams and collections
+
+- `stream().toList()` (unmodifiable, allows nulls) or `.collect(Collectors.toCollection(ArrayList::new))`
+  when mutability is required.
+- `List.copyOf`, `Map.copyOf`, `Set.copyOf` for defensive immutability; they reject nulls — that is
+  a feature, not a bug to work around.
+- Prefer an indexed `for` loop over a stream in the per-tick simulation path: allocation-free loops
+  matter at 2500 steps × 40 birds × 60 foods.
+- `Objects.requireNonNull(value, "message")` at boundaries; internal code relies on non-null by
+  construction.
+
+## Concurrency
+
+- The domain is single-threaded per simulation and owns a `Random` per instance; never share a
+  `Random` across threads (use `SplittableRandom` or a `ThreadLocalRandom` in the adapter).
+- The optimizer parallelises whole simulations with `parallelStream` / a fixed pool; each task
+  creates its own `Simulation` and `Random`. No shared mutable domain state.
+- Virtual threads are appropriate for blocking I/O adapters (file writing, socket work), not for
+  CPU-bound simulation work.
+- JavaFX work stays on the FX application thread; `Platform.runLater` is the only bridge from a
+  background thread, and it belongs in the UI adapter.
+
+## Deprecations and warnings
+
+- No deprecated API in new code. When touching a file, replace the deprecated call in the code you
+  are already editing.
+- Keep `-Xlint:deprecation,unchecked` at zero new warnings. An unchecked cast must be justified with
+  a comment and, where possible, removed with a sealed type or generics.
+
+## Anti-patterns to reject
+
+- `new Random()` inside a domain method (non-deterministic, untestable).
+- `System.out.println` in the domain (use SLF4J; adapters may print deliberate CLI output).
+- `Thread.sleep` for animation (use JavaFX `Timeline` / `AnimationTimer`).
+- Returning a mutable internal array from a getter (SpotBugs `EI_EXPOSE_REP`).
+- `double` arithmetic silently replacing `float` in simulation hot paths.
+- `Optional` as a field or parameter type; use it only as a return type.
+- Checked exceptions leaking out of the domain; convert to `IllegalArgumentException` /
+  `IllegalStateException` with a message, or model failure as a sealed result type.

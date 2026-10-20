@@ -1,0 +1,157 @@
+---
+description: JShorelark project overview - modules, packages, build, dependencies, fidelity to Rust
+alwaysApply: true
+---
+
+# JShorelark Project Rules
+
+You are an expert in Java 21, JavaFX, Maven multi-module builds, evolutionary computation and
+feed-forward neural networks, working on a port of the Shorelark bird evolution simulator.
+
+## Project overview
+
+`JShorelark` is a Java 21 / JavaFX port of
+[Shorelark](https://codeberg.org/pwy/shorelark) (originally
+[patryk27/shorelark](https://github.com/patryk27/shorelark)). Birds live in a unit-square toroidal
+world, sense food through a segmented field of view, and steer with their own neural network. A
+genetic algorithm replaces the population every `sim_generation_length` ticks, selecting parents by
+fitness (satiation), crossing their weight vectors over and mutating the result.
+
+**The Rust implementation is the specification.** Whenever behaviour is ambiguous, read the Rust
+source (`libs/genetic-algorithm`, `libs/neural-network`, `libs/simulation`, `libs/optimizer`) and
+match it. Deviations must be intentional and documented in `TO-DO.md`.
+
+Key Rust counterparts:
+
+| Rust | Java |
+|---|---|
+| `ga::GeneticAlgorithm<S>::evolve` | `io.jshorelark.genetic.GeneticAlgorithm#evolve` |
+| `ga::Chromosome` | `io.jshorelark.genetic.Chromosome` |
+| `ga::Statistics::new` | `io.jshorelark.genetic.statistics.Statistics#of` |
+| `ga::RouletteWheelSelection` | `io.jshorelark.genetic.selection.RouletteWheelSelection` |
+| `ga::UniformCrossover` | `io.jshorelark.genetic.crossover.UniformCrossover` |
+| `ga::GaussianMutation` | `io.jshorelark.genetic.mutation.GaussianMutation` |
+| `nn::Network` / `nn::Layer` / `nn::Neuron` | `io.jshorelark.neural.NeuralNetwork` / `Layer` / `Neuron` |
+| `nn::LayerTopology` | `int[] topology` (`Config#getBrainTopology`) |
+| `sim::Simulation` | `io.jshorelark.simulation.Simulation` |
+| `sim::World` | `io.jshorelark.simulation.physics.World` |
+| `sim::Animal` | `io.jshorelark.simulation.bird.Bird` |
+| `sim::Eye` | `io.jshorelark.simulation.bird.BirdEye` |
+| `sim::Brain` | `io.jshorelark.simulation.bird.BirdBrain` |
+| `sim::AnimalIndividual` | `io.jshorelark.simulation.bird.BirdIndividual` |
+| `sim::Config` | `io.jshorelark.simulation.Config` |
+| `optimizer::simulate` / `analyze` | `io.jshorelark.optimizer.simulate.SimulateCommand` / `analyze.AnalyzeCommand` |
+
+## Modules
+
+| Module | Role | May depend on |
+|---|---|---|
+| `config-resources` | Checkstyle / PMD / Log4j2 resources shared by every module | nothing |
+| `genetic-algorithm` | Chromosome, selection, crossover, mutation, statistics | JDK, Jackson annotations |
+| `neural-network` | Layer, Neuron, NeuralNetwork, topology, weight (de)serialisation | `genetic-algorithm` |
+| `simulation` | Config, World, Bird, BirdEye, BirdBrain, Food, Simulation | `genetic-algorithm`, `neural-network` |
+| `optimizer` | PicoCLI commands, parallel grid search, JSONL logs, CSV analysis | `simulation` |
+| `simulation-ui` | JavaFX application, Canvas renderer, controls, charts, sound | `simulation` |
+
+Rules that keep the boundaries honest:
+
+1. The three domain modules are **pure Java**: no `javafx.*`, no `java.io` file APIs, no
+   `System.out`, no threads.
+2. `simulation-ui` observes `Simulation`; it never mutates birds directly to "fix" what the domain
+   should be doing.
+3. `optimizer` owns the only `System.out` and `Files` usage outside JavaFX.
+4. `config-resources` is a resource jar; it must not gain Java sources.
+
+## Package layout
+
+```
+io.jshorelark.genetic                     Chromosome, Individual, GeneticAlgorithm, Pair
+io.jshorelark.genetic.crossover           CrossoverMethod, UniformCrossover, SinglePointCrossover
+io.jshorelark.genetic.mutation            MutationMethod, GaussianMutation, RandomResetMutation
+io.jshorelark.genetic.selection           SelectionMethod, RouletteWheelSelection, TournamentSelection
+io.jshorelark.genetic.statistics          Statistics
+io.jshorelark.neural                      LayeredNetwork, NeuralNetwork, Layer, Neuron, NetworkFactory
+io.jshorelark.simulation                  Config, Simulation, Statistics
+io.jshorelark.simulation.bird             Bird, BirdBrain, BirdEye, BirdIndividual
+io.jshorelark.simulation.food             Food
+io.jshorelark.simulation.physics          Vector2D, World
+io.jshorelark.simulation.events           CollisionEvent
+io.jshorelark.optimizer                   Main, OptimizingSimulation, Optimization* value types
+io.jshorelark.optimizer.simulate          SimulateCommand, ConfigurationIteration
+io.jshorelark.optimizer.analyze           AnalyzeCommand
+io.jshorelark.simulation.ui               SimulationApplication, SimulationView, SimulationControls, ...
+io.jshorelark.simulation.ui.evolution     EvolutionManager, EvolutionStatistics
+io.jshorelark.simulation.ui.controls      ControlBuilder
+io.jshorelark.simulation.ui.dialogs       AboutDialog
+io.jshorelark.simulation.ui.audio         SoundManager
+io.jshorelark.simulation.ui.icons         AppIcon, SvgIcons
+```
+
+## Build facts
+
+- Root aggregator: `io.jshorelark:jshorelark-parent:1.0-SNAPSHOT`, `packaging=pom`.
+- Java release is a property (`java.version`, currently `21`) referenced by `maven.compiler.release`.
+- All dependency versions are properties in the root POM; module POMs never repeat them.
+- Spotless, Checkstyle, SpotBugs, PMD and JaCoCo are configured in `<pluginManagement>` and opted
+  into per module, except the gates that must run everywhere.
+- `config-resources` is a dependency of every module that needs Checkstyle/PMD resources; when a
+  quality configuration must change, change it there and let the modules pick it up.
+
+Useful commands (from the repo root):
+
+```bash
+mvn -B -ntp spotless:apply
+mvn -B -ntp -DskipTests package
+mvn -B -ntp test
+mvn -B -ntp verify
+mvn -B -ntp -pl simulation-ui javafx:run
+mvn -B -ntp -pl optimizer exec:java -Dexec.args="simulate -o results.jsonl"
+```
+
+## Coding conventions beyond the style guide
+
+- Records for value types (statistics, log entries, configuration snapshots). Lombok `@Value` /
+  `@Builder` / `@With` only where a record cannot express the shape (Jackson builders, mutable
+  simulation objects).
+- `@RecordBuilder` for records that need a Jackson-friendly builder or a fluent `with…` API.
+- Getters follow record style (`position()`, `speed()`) in new domain records; existing Lombok
+  `getX()` accessors stay until the surrounding code is modernised in one coherent change.
+- Naming: `Bird` not `Animal`; `BirdEye` / `BirdBrain` mirror the Rust `Eye` / `Brain` split.
+- No static mutable state anywhere. Constants are `UPPER_SNAKE_CASE` and `static final`.
+- Logging via `@Slf4j`, parameterised (`log.debug("… {}", value)`), never string concatenation. The
+  domain logs sparingly; adapters log process detail.
+- User-visible strings live in the UI layer. When adding text, keep it ready for externalisation
+  (no string concatenation that cannot be translated).
+
+## Testing expectations
+
+- JUnit 6 (`junit-jupiter`) + AssertJ; Mockito only for adapter seams.
+- Domain tests must be deterministic: pass a `new Random(seed)` instead of relying on the global
+  random source.
+- Port Rust tests that encode behaviour (eye vision grids, neuron propagation, GA golden output,
+  statistics median for even/odd sizes).
+- Coverage gate: 80% lines for the domain modules; UI and CLI are exercised by a small smoke test
+  instead of pixel assertions.
+
+## Documentation map
+
+- `README.md` — what the project is, how to build and run.
+- `src/docs/asciidoc/index.adoc` — architecture and evolution walkthrough (AsciiDoc, PDF/HTML).
+- `TO-DO.md` — prioritised backlog with the fidelity findings.
+- `ROADMAP.mmd` — Mermaid roadmap of the same plan.
+- `.cursor/rules/` — the long-form engineering rules; this file is the project fact sheet.
+
+## Things that are easy to get wrong
+
+- **Rotation space.** Rust stores a `Rotation2` (angle in radians, CCW, 0 = facing +Y) and moves
+  with `rotation * Vector2::new(0.0, speed)`. Java stores a plain `float rotation` and must convert
+  consistently in exactly one place. Do not scatter `±π/2` offsets across renderer and physics.
+- **Angle to food.** Rust uses `Rotation2::rotation_between(&Vector2::y(), &vec).angle()`, i.e. the
+  angle is measured from the +Y axis. `atan2(vec.x, vec.y)` reproduces it; `atan2(vec.y, vec.x)`
+  does not.
+- **Collision radius.** Rust compares `distance <= config.food_size` only.
+- **Generation trigger.** Rust counts `age` steps and evolves when `age > sim_generation_length`;
+  satiation is the *fitness*, never the clock.
+- **Brain output scaling.** Rust clamps the raw network output to `[0, 2]` and then subtracts `1`
+  to obtain `[-1, 1]` before clamping again by the acceleration limits.
+- **Median.** Even-sized populations average the two middle values.

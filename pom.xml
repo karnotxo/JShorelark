@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.jshorelark</groupId>
@@ -10,69 +10,78 @@
   <packaging>pom</packaging>
 
   <name>JShorelark</name>
-  <description>A Java/JavaFX port of the Shorelark bird evolution simulator</description>
+  <description>Java 21 / JavaFX port of the Shorelark bird evolution simulator</description>
   <url>https://github.com/karnotxo/JShorelark</url>
+
+  <licenses>
+    <license>
+      <name>MIT</name>
+      <url>https://opensource.org/licenses/MIT</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
 
   <modules>
     <module>config-resources</module>
     <module>genetic-algorithm</module>
     <module>neural-network</module>
-    <module>optimizer</module>
     <module>simulation</module>
+    <module>optimizer</module>
     <module>simulation-ui</module>
   </modules>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <java.version>17</java.version>
-    <maven.compiler.release>${java.version}</maven.compiler.release>
-    <maven.compiler.source>${java.version}</maven.compiler.source>
-    <maven.compiler.target>${java.version}</maven.compiler.target>
 
-    <!-- Core Dependencies -->
-    <reactor-bom.version>2024.0.1</reactor-bom.version>
-    <netty-bom.version>4.1.116.Final</netty-bom.version>
-    <log4j-bom.version>2.24.3</log4j-bom.version>
-    <junit-bom.version>5.11.4</junit-bom.version>
+    <!-- Language level: single source of truth for javac and every plugin. -->
+    <java.version>21</java.version>
+    <maven.compiler.release>21</maven.compiler.release>
 
-    <!-- Dependencies Versions -->
-    <lombok.version>1.18.36</lombok.version>
-    <record-builder.version>44</record-builder.version>
-    <slf4j.version>2.0.16</slf4j.version>
-    <assertj.version>3.27.0</assertj.version>
-    <mockito.version>5.14.2</mockito.version>
-    <commons-math3.version>3.6.1</commons-math3.version>
-    <commons-lang3.version>3.14.0</commons-lang3.version>
-    <javafx.version>21.0.2</javafx.version>
-    <jackson.version>2.18.2</jackson.version>
-    <picocli.version>4.7.6</picocli.version>
+    <!-- Runtime dependencies -->
+    <jackson.version>2.22.4</jackson.version>
+    <javafx.version>21.0.12</javafx.version>
+    <log4j.version>2.26.1</log4j.version>
+    <picocli.version>4.7.7</picocli.version>
+    <slf4j.version>2.0.20</slf4j.version>
 
-    <!-- Plugin Versions -->
-    <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
-    <maven-surefire-plugin.version>3.2.3</maven-surefire-plugin.version>
-    <maven-failsafe-plugin.version>3.2.3</maven-failsafe-plugin.version>
-    <maven-javadoc-plugin.version>3.6.3</maven-javadoc-plugin.version>
-    <maven-pmd-plugin.version>3.21.2</maven-pmd-plugin.version>
+    <!-- Compile-time helpers -->
+    <lombok.version>1.18.48</lombok.version>
+    <record-builder.version>53</record-builder.version>
+
+    <!-- Testing -->
+    <assertj.version>3.27.7</assertj.version>
+    <junit-bom.version>6.1.3</junit-bom.version>
+    <mockito.version>5.24.0</mockito.version>
+
+    <!-- Build plugins -->
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
-    <jacoco-maven-plugin.version>0.8.11</jacoco-maven-plugin.version>
-    <spotbugs-maven-plugin.version>4.8.2.0</spotbugs-maven-plugin.version>
-    <spotless-maven-plugin.version>2.43.0</spotless-maven-plugin.version>
-    <asciidoctor-maven-plugin.version>2.2.4</asciidoctor-maven-plugin.version>
-    <asciidoctorj-pdf.version>2.3.10</asciidoctorj-pdf.version>
-    <asciidoctorj-diagram.version>2.2.13</asciidoctorj-diagram.version>
-    <checkstyle.version>10.21.1</checkstyle.version>
-    <google-java-format.version>1.25.2</google-java-format.version>
-    <javafx.maven.plugin.version>0.0.8</javafx.maven.plugin.version>
+    <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+    <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+    <maven-failsafe-plugin.version>3.6.0</maven-failsafe-plugin.version>
+    <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+    <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
+    <maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
+    <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
+    <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
+    <spotless-maven-plugin.version>3.10.4</spotless-maven-plugin.version>
 
-    <sonar.organization>your-org</sonar.organization>
-    <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-    <sonar.projectKey>your-project-key</sonar.projectKey>
+    <!-- Tool versions -->
+    <checkstyle.version>14.3.0</checkstyle.version>
+    <google-java-format.version>1.37.0</google-java-format.version>
+    <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
+
+    <!-- Quality gates: never lowered to get a green build. -->
+    <jacoco.coverage.minimum>0.80</jacoco.coverage.minimum>
+
+    <!-- Resolved absolutely so module POMs need no relative paths. -->
+    <checkstyle.config.location>${maven.multiModuleProjectDirectory}/config-resources/src/main/resources/checkstyle/google_checks.xml</checkstyle.config.location>
+    <pmd.ruleset.location>${maven.multiModuleProjectDirectory}/pmd-ruleset.xml</pmd.ruleset.location>
   </properties>
 
   <dependencyManagement>
     <dependencies>
-      <!-- Project Modules -->
+      <!-- Project modules -->
       <dependency>
         <groupId>${project.groupId}</groupId>
         <artifactId>config-resources</artifactId>
@@ -90,12 +99,12 @@
       </dependency>
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>optimizer</artifactId>
+        <artifactId>simulation</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>simulation</artifactId>
+        <artifactId>optimizer</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -106,16 +115,16 @@
 
       <!-- BOMs -->
       <dependency>
-        <groupId>io.projectreactor</groupId>
-        <artifactId>reactor-bom</artifactId>
-        <version>${reactor-bom.version}</version>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
         <artifactId>log4j-bom</artifactId>
-        <version>${log4j-bom.version}</version>
+        <version>${log4j.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -127,7 +136,7 @@
         <scope>import</scope>
       </dependency>
 
-      <!-- Core Dependencies -->
+      <!-- Annotation processors -->
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
@@ -141,30 +150,21 @@
         <scope>provided</scope>
       </dependency>
 
-      <!-- JSON Processing -->
+      <!-- JSON: versions come from jackson-bom. -->
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
-        <version>${jackson.version}</version>
       </dependency>
 
-      <!-- Command Line -->
+      <!-- CLI -->
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
         <version>${picocli.version}</version>
-      </dependency>
-
-      <!-- Math -->
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-math3</artifactId>
-        <version>${commons-math3.version}</version>
       </dependency>
 
       <!-- Logging -->
@@ -172,6 +172,18 @@
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>${slf4j.version}</version>
+      </dependency>
+
+      <!-- JavaFX: LTS line, pinned to the JDK 21 toolchain. -->
+      <dependency>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-controls</artifactId>
+        <version>${javafx.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-media</artifactId>
+        <version>${javafx.version}</version>
       </dependency>
 
       <!-- Testing -->
@@ -197,27 +209,16 @@
   </dependencyManagement>
 
   <dependencies>
-    <!-- Lombok -->
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
       <scope>provided</scope>
     </dependency>
-
-    <!-- Record Builder -->
     <dependency>
       <groupId>io.soabase.record-builder</groupId>
       <artifactId>record-builder-core</artifactId>
       <scope>provided</scope>
     </dependency>
-
-    <!-- Math -->
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-math3</artifactId>
-    </dependency>
-
-    <!-- Logging -->
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
@@ -225,13 +226,14 @@
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-slf4j2-impl</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
-    <!-- Testing -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -252,14 +254,17 @@
   <build>
     <pluginManagement>
       <plugins>
-        <!-- Core plugins -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>${maven-compiler-plugin.version}</version>
           <configuration>
-            <release>${java.version}</release>
+            <release>${maven.compiler.release}</release>
             <encoding>${project.build.sourceEncoding}</encoding>
+            <parameters>true</parameters>
+            <compilerArgs>
+              <arg>-Xlint:all,-serial</arg>
+            </compilerArgs>
             <annotationProcessorPaths>
               <path>
                 <groupId>org.projectlombok</groupId>
@@ -275,7 +280,6 @@
           </configuration>
         </plugin>
 
-        <!-- Testing plugins -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
@@ -286,13 +290,13 @@
           <artifactId>maven-failsafe-plugin</artifactId>
           <version>${maven-failsafe-plugin.version}</version>
         </plugin>
+
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
           <version>${jacoco-maven-plugin.version}</version>
         </plugin>
 
-        <!-- Code quality plugins -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-checkstyle-plugin</artifactId>
@@ -305,9 +309,15 @@
             </dependency>
           </dependencies>
           <configuration>
-            <configLocation>google_checks.xml</configLocation>
+            <configLocation>${checkstyle.config.location}</configLocation>
+            <!--
+              google_checks.xml defaults every module to the "warning" severity. Promoting it to
+              "error" is what turns the stock rules into a real gate instead of console noise.
+            -->
+            <propertyExpansion>org.checkstyle.google.severity=error</propertyExpansion>
             <consoleOutput>true</consoleOutput>
             <failsOnError>true</failsOnError>
+            <violationSeverity>error</violationSeverity>
             <linkXRef>false</linkXRef>
           </configuration>
         </plugin>
@@ -316,102 +326,121 @@
           <groupId>com.github.spotbugs</groupId>
           <artifactId>spotbugs-maven-plugin</artifactId>
           <version>${spotbugs-maven-plugin.version}</version>
+          <configuration>
+            <effort>Max</effort>
+            <threshold>Low</threshold>
+            <excludeFilterFile>${maven.multiModuleProjectDirectory}/spotbugs-exclude.xml</excludeFilterFile>
+          </configuration>
         </plugin>
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-pmd-plugin</artifactId>
           <version>${maven-pmd-plugin.version}</version>
+          <configuration>
+            <rulesets>
+              <ruleset>${pmd.ruleset.location}</ruleset>
+            </rulesets>
+            <printFailingErrors>true</printFailingErrors>
+            <failOnViolation>true</failOnViolation>
+            <failurePriority>3</failurePriority>
+            <linkXRef>false</linkXRef>
+          </configuration>
         </plugin>
 
-        <!-- Documentation plugins -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
             <encoding>${project.build.sourceEncoding}</encoding>
-            <source>${java.version}</source>
+            <release>${maven.compiler.release}</release>
             <docencoding>${project.reporting.outputEncoding}</docencoding>
             <charset>${project.reporting.outputEncoding}</charset>
-            <failOnError>false</failOnError>
+            <doclint>all,-missing</doclint>
           </configuration>
         </plugin>
-        <plugin>
-          <groupId>org.asciidoctor</groupId>
-          <artifactId>asciidoctor-maven-plugin</artifactId>
-          <version>${asciidoctor-maven-plugin.version}</version>
-          <dependencies>
-            <dependency>
-              <groupId>org.asciidoctor</groupId>
-              <artifactId>asciidoctorj-pdf</artifactId>
-              <version>${asciidoctorj-pdf.version}</version>
-            </dependency>
-            <dependency>
-              <groupId>org.asciidoctor</groupId>
-              <artifactId>asciidoctorj-diagram</artifactId>
-              <version>${asciidoctorj-diagram.version}</version>
-            </dependency>
-          </dependencies>
-        </plugin>
 
-        <!-- Code formatting -->
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
           <version>${spotless-maven-plugin.version}</version>
           <configuration>
             <java>
-              <!-- Apply Google Java Style -->
               <googleJavaFormat>
                 <version>${google-java-format.version}</version>
                 <style>GOOGLE</style>
                 <reflowLongStrings>true</reflowLongStrings>
                 <formatJavadoc>true</formatJavadoc>
               </googleJavaFormat>
-
-              <!-- Remove unused imports -->
               <removeUnusedImports/>
-
-              <!-- Import ordering -->
-              <importOrder>
-                <order>java,javax,org,com,io.jshorelark,,\#</order>
-              </importOrder>
-
-              <!-- License header -->
+              <!--
+                google-java-format also owns import ordering (static block first, then a single
+                lexicographic block). Adding a separate <importOrder> step would fight it and
+                Checkstyle's CustomImportOrder at the same time.
+              -->
               <licenseHeader>
                 <content>/*
  * Copyright (c) $YEAR JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 </content>
               </licenseHeader>
             </java>
+            <pom>
+              <sortPom>
+                <expandEmptyElements>false</expandEmptyElements>
+                <spaceBeforeCloseEmptyElement>true</spaceBeforeCloseEmptyElement>
+              </sortPom>
+            </pom>
           </configuration>
-          <executions>
-            <execution>
-              <id>spotless-check</id>
-              <phase>validate</phase>
-              <goals>
-                <goal>check</goal>
-              </goals>
-            </execution>
-          </executions>
         </plugin>
 
-        <!-- JavaFX -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${maven-enforcer-plugin.version}</version>
+        </plugin>
+
         <plugin>
           <groupId>org.openjfx</groupId>
           <artifactId>javafx-maven-plugin</artifactId>
-          <version>${javafx.maven.plugin.version}</version>
+          <version>${javafx-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>
 
     <plugins>
-      <!-- Code formatting -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-toolchain</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,)</version>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
@@ -426,13 +455,12 @@
         </executions>
       </plugin>
 
-      <!-- Enforce code quality -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <executions>
           <execution>
-            <id>validate</id>
+            <id>checkstyle-check</id>
             <phase>validate</phase>
             <goals>
               <goal>check</goal>
@@ -446,7 +474,7 @@
         <artifactId>spotbugs-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>spotbugs</id>
+            <id>spotbugs-check</id>
             <phase>verify</phase>
             <goals>
               <goal>check</goal>
@@ -455,7 +483,21 @@
         </executions>
       </plugin>
 
-      <!-- Code coverage -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>pmd-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+              <goal>cpd-check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -468,23 +510,9 @@
           </execution>
           <execution>
             <id>report</id>
-            <phase>test</phase>
+            <phase>verify</phase>
             <goals>
               <goal>report</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
-      <!-- Documentation -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>attach-javadocs</id>
-            <goals>
-              <goal>jar</goal>
             </goals>
           </execution>
         </executions>
