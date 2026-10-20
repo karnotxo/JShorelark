@@ -90,13 +90,17 @@ was removed and `Food` became a record with `position()`.
 
 ## Fidelity risks still open
 
-- [x] **Golden evolution test.** There is no test that pins a whole generation of evolution to a
-  fixed seed. The operators are tested individually, but a change in operator order (crossover then
-  mutation, or the `0.00001f` fitness floor) would only show up as "learning looks worse". A
-  seeded end-to-end test over a handful of generations would close this.
-- [x] `f32` **vs** `f64` **in the optimizer analysis.** `AnalyzeCommand` accumulates fitness in `float`.
-  Rust uses `f32` too, but with many generations the summary can drift; confirm against a Rust run
-  before changing it, since matching Rust matters more than precision here.
+- [x] **Golden evolution test.** `GoldenEvolutionTest` runs 15 generations from a fixed seed and
+  asserts the exact min/max/avg/median of each one, a digest of every final bird (which also covers
+  the bias-first weight order) and that the median climbs. The values are a regression lock
+  produced by this implementation, not an oracle; the Rust-recorded fixture below is still the
+  remaining gap.
+- [x] **`f32` vs `f64` in the optimizer analysis.** Investigated and left in `f32` on purpose.
+  Rust's `AnalyzeCmd` accumulates into `OptStatistics`, whose fields are `f32`, so a `double`
+  accumulator would print different digits than the reference. Measured over a full grid point
+  (450 samples), the mean drifts about 1e-6 relative — two orders of magnitude below the 7
+  significant digits the CSV prints. `FitnessAccumulatorTest` records that reasoning and pins the
+  printed output, so the choice is a decision rather than an oversight.
 - [ ] **Thread-local randomness in the optimizer.** `SimulateCommand` uses `ThreadLocalRandom`, so a
   grid search is not reproducible. Rust seeds per configuration. Add an optional `--seed` that
   derives a per-configuration `Random` from it.
