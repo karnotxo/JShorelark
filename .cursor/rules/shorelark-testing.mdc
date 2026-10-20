@@ -1,0 +1,93 @@
+---
+description: Testing standards - JUnit 6, AssertJ, deterministic randomness, golden tests, coverage gates
+globs: **/src/test/**/*.java
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Stack
+
+- **JUnit 6** (`org.junit.jupiter`, from `junit-bom` in the root POM): `@Test`, `@Nested`,
+  `@ParameterizedTest`, `@DisplayName`, `@Timeout`, `@TempDir`.
+- **AssertJ** for every assertion.
+- **Mockito** only at adapter seams (never to stub a value object you can construct).
+- No Hamcrest, no JUnit 4, no static imports other than AssertJ's (`import static
+  org.assertj.core.api.Assertions.assertThat;`).
+
+## Structure
+
+- `@DisplayName` on the class and on any test whose method name would not read as a sentence.
+- `@Nested` classes group scenarios (`class GivenEmptyPopulation`, `class Propagate`), mirroring the
+  Rust `mod`/`mod` nesting where a test was ported.
+- Arrange / Act / Assert, separated by blank lines. One behaviour per test.
+- Test names describe behaviour (`returnsZeroForNegativeInput`), not implementation
+  (`testMaxFunction`).
+- Shared fixtures are `private static` factory methods at the bottom of the test class, not mutable
+  fields.
+
+## Determinism
+
+- Pass an explicit `new Random(seed)` (or `new Random(42)`) to anything stochastic. Golden tests
+  depend on it.
+- Never assert on values produced from `Math.random()`, `ThreadLocalRandom`, or the current time.
+- When a test needs the clock or files, use `@TempDir` and explicit timestamps; never the real clock.
+- Forbidden in tests: `Thread.sleep` (use `@Timeout` and deterministic waits), network access,
+  launching a JavaFX toolkit (test the pure parts instead).
+
+## What to assert
+
+- Return values and state transitions, not implementation details (no verifying private calls).
+- Error contracts: `assertThatThrownBy(...).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("...")`.
+  Message assertions keep error handling honest.
+- Floating-point values with an explicit tolerance:
+  `assertThat(value).isCloseTo(expected, within(1e-6f))`. Exact equality is acceptable only for
+  gene-by-gene copies and integer-derived values.
+- Collections with their shape: `hasSize`, `containsExactly`, `allSatisfy`, `anyMatch`.
+- For seeded golden values ported from Rust, keep the Rust comment (test name, expected value) next
+  to the assertion so future readers can re-verify against upstream.
+
+## Test coverage priorities
+
+1. **Behaviour encoded in Rust tests**: neuron propagation, network weight round-trip, crossover
+   masks, mutation probabilities, roulette-wheel distribution, statistics median (even/odd), eye
+   vision ASCII grids. Port them first; they are the fidelity contract.
+2. **Domain invariants**: wrapping, distance, rotation normalisation, generation boundary, food
+   respawn, empty-population errors.
+3. **Adapters**: one smoke test per CLI command (with `@TempDir`), and pure helpers extracted from
+   the UI so they can be tested without a toolkit.
+
+## Test double guidance
+
+- Prefer a real object with a fixed seed over a mock.
+- `TestIndividual` (in `src/test`) is the standard GA test fixture: a chromosome-backed individual
+  whose fitness is the gene sum, plus a fitness-only variant. Reuse it instead of inventing another
+  fake.
+- Mock only: file systems, clocks, external processes, and JavaFX services.
+
+## Coverage
+
+- Gate: **80% lines** on `genetic-algorithm` and `neural-network`; keep `simulation` at or above the
+  same bar. UI and CLI are validated by smoke tests, not by a coverage number.
+- A new branch (new `if`, new `switch` arm) needs a test that exercises it, including the failure
+  path.
+- Do not add `@Generated`, `@SuppressWarnings("checkstyle:...")` or exclusions to reach a number;
+  fix the design so the code is testable.
+
+## Performance-sensitive tests
+
+- Mark slow tests with `@Tag("slow")` and keep the default `mvn test` fast (< 30 s for the reactor).
+- Optimizer/simulation soak tests use a reduced `simGenerationLength` (for example 50 steps) and a
+  tiny world, never the 2500-step default.
+- Use `@Timeout` on anything that loops until a condition holds, so a regression fails instead of
+  hanging CI.
+
+## Anti-patterns
+
+- Asserting on `toString()` output for domain logic.
+- Sleeping to "let the animation settle".
+- Tests that depend on execution order or on shared mutable static state.
+- A test that passes only because assertions are missing (`assertThat(list).isNotEmpty()` as the
+  only check of a computation).
+- Duplicating production maths in the test to compute the expected value (the test then validates
+  nothing).

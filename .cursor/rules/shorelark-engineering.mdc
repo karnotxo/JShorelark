@@ -1,0 +1,146 @@
+---
+description: Engineering directives - SOLID/KISS/DRY, Java 21, hexagonal architecture, static analysis, Google style
+alwaysApply: true
+---
+
+# JShorelark Engineering Directives
+
+These five directives are **non-negotiable** for every change. They complement
+`shorelark-project` (domain facts), `shorelark-java21` (language features), `shorelark-simulation`
+(evolution mechanics) and `shorelark-testing` (test patterns). If a directive conflicts with a
+shortcut, the directive wins.
+
+## 1. SOLID, KISS, DRY
+
+- **Single Responsibility**: one calculator / validator / renderer per concern. A class name that
+  needs "and" (`WorldAndCollisionManager`) is a design smell. `simulation/` holds domain state and
+  pure calculations, `simulation-ui/` holds JavaFX widgets and drawing, `optimizer/` holds CLI and
+  file I/O — never mix them.
+- **Open/Closed**: extend through a seeded hierarchy, a strategy implementation or a table entry,
+  not by adding an `if` branch to an existing switch. `CrossoverMethod`, `MutationMethod` and
+  `SelectionMethod` are the extension points; `switch` over a sealed action type must stay
+  exhaustive so the compiler lists every place that needs updating.
+- **Liskov / Interface Segregation**: keep ports small and behavioural. A strategy interface
+  declares the one operation it performs (`crossover`, `mutate`, `select`) and nothing else.
+- **Dependency Inversion**: high-level code depends on abstractions (`Random`, `LayeredNetwork`,
+  `Individual`), never on JavaFX, Jackson or PicoCLI types. The domain has no idea it is being
+  drawn.
+- **KISS**: prefer a pure static function over an injected service over a framework. No speculative
+  abstraction, no generic `Manager`, no reflection where a direct call works.
+- **DRY**: exactly one source of truth per rule.
+  - Collision radius: `Config#foodSize` (see the bug entry in `TO-DO.md`).
+  - Generation length and stepping: `Simulation`, not the UI.
+  - Statistics: `Statistics.of(population)` for the GA, `io.jshorelark.simulation.Statistics` for a
+    generation. The UI must never recompute a fitness aggregate the domain already provides.
+- Duplication that differs only in *presentation* is not a DRY violation; duplication of *rules* is.
+
+## 2. Newest stable language and library features
+
+- Target **JDK 21** (`maven.compiler.release=21`) and use every feature that is **final** in 21:
+  records, sealed types and interfaces, record patterns, pattern-matching `switch`,
+  `Math.clamp`, Sequenced Collections (`getFirst()` / `getLast()`), text blocks, `var` for locals
+  with an obvious right-hand side. Never enable preview features.
+- **Versions**: dependencies are pinned as properties in the root `pom.xml`
+  (`junit-bom.version`, `jackson.version`, `javafx.version`, …). Policy:
+  1. Before using an API, confirm the version actually on the classpath and read the docs for **that**
+     version — never code against a remembered API.
+  2. When a newer **stable** release is mutually compatible, prefer it, but bump **one property per
+     step** and verify with `mvn -B -ntp -DskipTests package` plus the affected tests.
+  3. No version ranges, no snapshots, no `LATEST`/`RELEASE`, no unmaintained libraries. A new
+     dependency needs a justification: need, maintenance status, licence, footprint.
+  4. Record deliberate pins with a comment next to the property (for example a JavaFX LTS pin that
+     must match the toolchain).
+- Prefer the modern form of an API over its legacy equivalent: `stream().toList()` over
+  `collect(toList())`, `getFirst()`/`getLast()` over index math, `List.copyOf` over defensive
+  loops, `Math.clamp` over nested `min`/`max`, `java.time` over `Calendar`,
+  `Objects.requireNonNull(x, "msg")` over silent nulls, `String.formatted` over `String.format`
+  where it reads better.
+- Deprecated APIs are not acceptable in new code; when touching a file, replace the deprecated call
+  in the code you are already modifying.
+
+## 3. Hexagonal architecture (ports & adapters)
+
+Dependency direction is inward only:
+
+```
+adapters (in)                  domain                        adapters (out)
+simulation-ui / optimizer  ->  simulation + neural-network  ->  (none: domain owns no I/O)
+                               + genetic-algorithm
+```
+
+- **Domain** (`io.jshorelark.genetic`, `io.jshorelark.neural`, `io.jshorelark.simulation`): pure
+  Java. **No `javafx.*`, no `java.io` file APIs, no `System.out`, no `Platform.runLater`, no
+  `Thread.sleep`.**
+- **Ports** are the abstractions the domain needs and does not own:
+  - `java.util.Random` for every stochastic decision (constructor parameter, never a field created
+    internally).
+  - `Individual` / `Individual.Factory<I>` as the GA's contract with its population.
+  - `LayeredNetwork` as the brain's contract with the network implementation.
+  - Listener/callback types for cross-cutting notifications (for example collision callbacks) rather
+    than a reactive framework dependency.
+- **Adapters**:
+  - `optimizer`: PicoCLI commands, Jackson JSONL logging, thread pools, file output.
+  - `simulation-ui`: JavaFX scenes, Canvas drawing, animation timers, sound, charts.
+- Practical checks:
+  - Domain construction must be testable headlessly (no JavaFX toolkit, no `Application.launch`).
+  - Passing UI objects *into* a domain method is also a violation (no `GraphicsContext`,
+    `Color`, `Node` parameters).
+  - New I/O, clocks or randomness arrive through an injected port so tests can substitute them
+    deterministically.
+- Layering inside `simulation-ui/` mirrors the same idea: `SimulationApplication` orchestrates,
+  `SimulationView` paints, `*Controls` / `*Chart` format and lay out. Keep pure formatting out of
+  the animation loop.
+
+## 4. Static analysis is part of the definition of done
+
+Active gates (root `pom.xml`):
+
+| Tool | Scope | Gate |
+|---|---|---|
+| Spotless + `google-java-format` | formatting, imports, licence header | `validate` |
+| Checkstyle (`google_checks.xml`) | style | `validate`, severity `error` for this project |
+| SpotBugs (`effort=Max`, `threshold=Low`) | bug patterns | `verify`, filter `spotbugs-exclude.xml` |
+| PMD (`pmd-ruleset.xml`) + CPD | quality, duplication | `verify` |
+| JaCoCo | line coverage | `>= 0.80` on `genetic-algorithm` and `neural-network` (see module POMs) |
+| javac `-Xlint` | deprecation, unchecked | checked locally (`-Dmaven.compiler.showDeprecation`); keep new warnings at zero |
+
+Working rules:
+
+- Run `mvn -B -ntp verify` before calling work done, and **read the report**
+  (`target/checkstyle-result.xml`, `target/pmd.xml`, `target/spotbugsXml.xml`,
+  `target/site/jacoco/index.html`) rather than only the exit code.
+- Fix the defect, not the message. `EI_EXPOSE_REP` on a mutable array field, real `NP_*` / `DLS_*`
+  findings and `UselessParentheses` are code bugs.
+- An exclusion is a **documented design decision**: it needs a pattern/class match and a comment
+  explaining why. Never add a blanket package exclusion to silence a new finding, and never lower a
+  gate (`threshold`, `violationSeverity`, coverage minimum) to get green.
+- Suppress locally and narrowly when the finding is a true false positive: SpotBugs
+  `@SuppressFBWarnings` with a reason, or PMD `@SuppressWarnings("PMD.Rule")`, on the smallest scope.
+- Treat findings in touched files as yours: if your change introduces a warning, fix it now; if you
+  touch a file with pre-existing findings, fix the ones in the code you already rewrote and record
+  the rest in `TO-DO.md` instead of expanding an exclusion.
+
+## 5. Google style, faithfully, with comments where they earn their place
+
+- `google-java-format` is the single source of truth: 2-space indent, 100-column limit, explicit
+  non-wildcard imports (static first), braces on every control structure, class member order
+  (constants, fields, constructors, factories, public, package-private, private, nested types).
+- Style is not negotiable per-file: run `mvn -B -ntp spotless:apply` instead of hand-formatting.
+- **Javadoc** on every public type and public method of the domain and on every port: state the
+  behaviour, the parameters, the return value, and the thrown exceptions. For anything ported from
+  Rust, name the counterpart (`Animal::process_movement`) so the two can be diffed.
+- **Comments explain why, not what.** Cite the constraint or the source decision
+  (`// Rust compares against food_size only; the bird radius is a rendering concern.`). Do not
+  narrate code that is already clear, and do not leave commented-out code or `TODO` without an
+  owner.
+- Keep the licence header (Spotless enforces it) and keep lines under 100 columns even inside
+  comments.
+
+## Self-check before finishing any change
+
+1. Does each new type have exactly one reason to change, and does the rule live in exactly one
+   place?
+2. Did I verify the library/JDK API against the pinned version instead of assuming?
+3. Does the domain stay free of JavaFX/IO, and do new randomness and I/O arrive through ports?
+4. Did I run `mvn -B -ntp spotless:apply` and `mvn -B -ntp verify`, and did I read the reports?
+5. Are public APIs documented and are the non-obvious decisions commented with their Rust source?

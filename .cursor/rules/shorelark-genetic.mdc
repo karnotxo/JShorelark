@@ -1,0 +1,131 @@
+---
+description: Genetic algorithm and neural network - chromosomes, selection, crossover, mutation, statistics, layers
+globs: genetic-algorithm/**/*.java,neural-network/**/*.java
+alwaysApply: false
+---
+
+# Genetic Algorithm and Neural Network
+
+These two modules are pure computation. They must stay deterministic for a given `Random` seed and
+must reproduce the Rust crates `libs/genetic-algorithm` and `libs/neural-network`.
+
+## Chromosome
+
+A chromosome is a flat `float[]` of genes (network weights and biases, in layer order).
+
+- Genes are `float` to match Rust `f32`. Never widen to `double` internally.
+- The constructor and every accessor copy the array. A caller must never be able to mutate a
+  chromosome's internals (SpotBugs `EI_EXPOSE_REP` / `EI_EXPOSE_REP2`).
+- `Chromosome#length` / `isEmpty` / `get(int)` mirror Rust's `len` / `is_empty` / `Index`.
+- `mutate` mutates in place because mutation happens on a freshly crossed-over child; document that
+  ownership rule in the method's Javadoc. If you ever need a copy-on-write path, add
+  `Chromosome#mutatedCopy` rather than changing the contract of `mutate`.
+- Equality compares genes with a relative epsilon (`1e-7`) because floating-point round-trips
+  through the network are not bit-exact. `hashCode` must stay consistent with that tolerance, so
+  prefer not to rely on hashing chromosomes as map keys.
+
+## Individual and its factory
+
+- `Individual` is the port between the GA and the population: `getChromosome()`, `getFitness()`, and
+  a nested `Factory<I>` with `create(Chromosome)`.
+- The factory is passed to the GA, never discovered by reflection.
+- `BirdIndividual` clones the bird it wraps, so the GA's parent snapshot cannot be mutated by the
+  next simulation step.
+- `Individual#getFitness` returns satiation as `float`; do not expose a `double` overload.
+
+## Selection
+
+Two implementations exist; both are strategies under `SelectionMethod`.
+
+- **`RouletteWheelSelection`**: fitness-proportionate with a floor
+  (`Math.max(fitness, 0.00001f)`), cumulative weights and a binary search over
+  `random.nextFloat() * totalWeight`. The floor is what makes all-zero populations work; keep it as
+  a named constant with the Rust value.
+- **`TournamentSelection`**: pick `k` random individuals and return the fittest. It is a Java
+  addition (testing / experimentation); it must not become the default.
+- Every selection requires a non-empty population; throw `IllegalArgumentException` with a message
+  rather than returning `null`.
+
+## Crossover
+
+- **`UniformCrossover`** (the production default): for each gene index, take `a` with probability
+  0.5, otherwise `b`. Both parents must have the same length; assert it.
+- **`SinglePointCrossover`** (Java addition): one cut point, head from `a`, tail from `b`.
+- Never mutate the parents. Return a new `Chromosome`.
+
+## Mutation
+
+- **`GaussianMutation(chance, coeff)`** (the production default): for each gene, draw a random sign
+  (`±1`) and, with probability `chance`, add `sign * coeff * random.nextFloat()`.
+  - Validate `0 ≤ chance ≤ 1` in the factory (`create`), matching Rust's constructor assertion.
+  - The name says Gaussian but the Rust implementation is uniform; keep the name for parity and
+    document the discrepancy in Javadoc and `TO-DO.md`. Do not "fix" it silently — doing so changes
+    every existing trained result.
+- **`RandomResetMutation`** (Java addition): with probability `chance`, replace a gene with a fresh
+  uniform value in `[-1, 1]`.
+
+## GeneticAlgorithm
+
+```java
+var result = algorithm.evolve(random, population);
+var nextGeneration = result.getFirst();   // same size as the input
+var statistics = result.getSecond();
+```
+
+- One child per parent slot: the next generation has exactly the same size as the current one.
+- Each child draws **two independent** selections (`parentA`, `parentB`), crosses them, mutates the
+  child, then hands the chromosome to `Individual.Factory#create`.
+- Statistics describe the **input** population (the ones that were just evaluated), not the new one.
+- `evolve` must not sort or modify the input list.
+- The GA is stateless apart from its three strategies and the factory, so a single instance may be
+  reused across generations.
+
+## Statistics
+
+- `Statistics.of(population)` computes `min`, `max`, `avg`, `median`.
+- Median: sort fitnesses; for an even count average the two middle values, otherwise take the middle.
+- Empty population → `IllegalArgumentException` ("Population must not be empty").
+- The type must be immutable and value-comparable; it is serialised by the optimizer, so its
+  Jackson shape (`minFitness`, `maxFitness`, `avgFitness`, `medianFitness`) is part of the public
+  contract.
+
+## Neural network
+
+- `LayeredNetwork` is the port. `NeuralNetwork` is the only production implementation.
+- Topology is `int[]` (mirrors `nn::LayerTopology`); the last topology entry must equal
+  `response.length` used by the brain (`2`).
+- **Weight order is the serialisation contract**: for each layer, for each neuron, the bias comes
+  first, then that neuron's input weights. `weights()` and `fromWeights()` must agree exactly, and
+  `Layer#fromWeights` must keep the same order. Changing the order invalidates every saved
+  chromosome and every golden test.
+- Activation is **ReLU only** (`max(0, sum + bias)`) in the production path. `ActivationFunction`
+  exists for experimentation; adding a second activation to the Bird is a behaviour change that
+  needs a documented decision.
+- `Neuron` clones its weights on construction and access.
+- `NeuralNetwork#propagate` must validate the input length against the first layer and throw
+  `IllegalArgumentException` with the expected/actual sizes.
+- `fromWeights` must reject both too few and too many weights, with distinct messages.
+- `NetworkFactory` is a convenience facade; do not duplicate logic between it and
+  `NeuralNetwork`.
+
+## Determinism and testing
+
+- Every stochastic path takes a `Random` parameter; the same seed must produce the same chromosome,
+  the same population and the same statistics.
+- Golden tests (porting Rust's seeded assertions) are the best regression insurance: seed `Random`,
+  build the smallest meaningful structure, and assert exact (or epsilon-close) values.
+- Property-style checks worth keeping:
+  - `fromWeights(network.weights())` is identity for a random network.
+  - Uniform crossover's genes come from exactly one parent per index.
+  - Mutation with `chance == 0` or `coeff == 0` never changes a chromosome.
+  - Statistics median matches a hand-computed value for even and odd sizes.
+
+## Anti-patterns
+
+- Sharing one `Random` across optimizer threads.
+- Exposing `float[]` from a getter.
+- Computing statistics inside `evolve` from the *new* population.
+- Reordering weights in one direction only.
+- Adding an `if (method == ...)` branch inside `GeneticAlgorithm` instead of using the strategy
+  interfaces.
+- Silently changing the mutation distribution to a true Gaussian.

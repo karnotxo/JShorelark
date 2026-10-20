@@ -2,65 +2,60 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.physics;
 
 import java.util.Random;
 
-import lombok.Value;
-
 /**
- * A 2D vector with x and y coordinates.
+ * An immutable 2D vector in model space (unit square, Y up).
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Java counterpart of the {@code nalgebra} {@code Point2}/{@code Vector2} operations the Rust
+ * simulation uses. All arithmetic returns new instances; no method mutates {@code this}.
+ *
+ * @param x the horizontal component
+ * @param y the vertical component
  */
-@Value
-public class Vector2D implements Cloneable {
-  /** Zero vector constant. */
-  public static final Vector2D ZERO = new Vector2D(0, 0);
+public record Vector2D(float x, float y) {
 
-  /** The x coordinate. */
-  float x;
-
-  /** The y coordinate. */
-  float y;
+  /** The origin. */
+  public static final Vector2D ZERO = new Vector2D(0.0f, 0.0f);
 
   /**
-   * Creates a new vector at (0,0).
+   * Returns the origin.
    *
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * @return the zero vector
    */
   public static Vector2D zero() {
     return ZERO;
   }
 
   /**
-   * Creates a new vector at (1,0).
+   * Returns the unit vector along +X.
    *
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * @return the right vector
    */
   public static Vector2D right() {
-    return new Vector2D(1, 0);
+    return new Vector2D(1.0f, 0.0f);
   }
 
   /**
-   * Creates a new vector with random coordinates between 0 and 1.
+   * Returns a vector with both coordinates drawn uniformly from {@code [0, 1)}.
    *
-   * @param random a {@link java.util.Random} object
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * @param random the random source
+   * @return a random point inside the world
    */
   public static Vector2D random(Random random) {
     return new Vector2D(random.nextFloat(), random.nextFloat());
   }
 
   /**
-   * Creates a new vector from polar coordinates (angle in radians).
+   * Builds a vector from an angle and a magnitude.
    *
-   * @param angle a float
-   * @param magnitude a float
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * @param angle the angle in radians, counter-clockwise from +X
+   * @param magnitude the length of the resulting vector
+   * @return the polar vector
    */
   public static Vector2D fromPolar(float angle, float magnitude) {
     return new Vector2D(
@@ -68,154 +63,121 @@ public class Vector2D implements Cloneable {
   }
 
   /**
-   * Gets the x coordinate.
+   * Adds another vector.
    *
-   * @return a float
-   */
-  public float x() {
-    return x;
-  }
-
-  /**
-   * Gets the y coordinate.
-   *
-   * @return a float
-   */
-  public float y() {
-    return y;
-  }
-
-  /**
-   * Adds another vector to this one.
-   *
-   * @param other a {@link io.jshorelark.simulation.physics.Vector2D} object
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * @param other the vector to add
+   * @return the sum
    */
   public Vector2D add(Vector2D other) {
-    return new Vector2D(x + other.x(), y + other.y());
+    return new Vector2D(x + other.x, y + other.y);
   }
 
   /**
-   * Subtracts another vector from this one.
+   * Subtracts another vector.
    *
-   * @param other a {@link io.jshorelark.simulation.physics.Vector2D} object
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * @param other the vector to subtract
+   * @return the difference
    */
   public Vector2D subtract(Vector2D other) {
-    return new Vector2D(x - other.x(), y - other.y());
+    return new Vector2D(x - other.x, y - other.y);
   }
 
   /**
-   * Scales this vector by a factor.
+   * Multiplies both components by a factor.
    *
-   * @param factor a float
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * @param factor the scale factor
+   * @return the scaled vector
    */
   public Vector2D scale(float factor) {
     return new Vector2D(x * factor, y * factor);
   }
 
   /**
-   * Returns the length (magnitude) of this vector.
+   * Returns the Euclidean length.
    *
-   * @return a float
+   * @return the magnitude
    */
   public float length() {
-    return (float) Math.sqrt(x * x + y * y);
+    return (float) Math.sqrt(distanceSquared(ZERO));
   }
 
   /**
-   * Returns this vector normalized (length = 1).
+   * Returns a unit vector with the same direction, or the origin for the zero vector.
    *
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * @return the normalised vector
    */
   public Vector2D normalize() {
     float len = length();
-    if (len == 0) {
-      return Vector2D.zero();
-    }
-    return new Vector2D(x / len, y / len);
+    return len == 0.0f ? ZERO : new Vector2D(x / len, y / len);
   }
 
   /**
-   * Rotates this vector by an angle in radians (counter-clockwise, matching nalgebra's Rotation2).
+   * Rotates this vector counter-clockwise.
    *
-   * <p>In nalgebra, Rotation2 is a 2x2 matrix: | cos θ -sin θ | | sin θ cos θ |
+   * <p>Reproduces {@code nalgebra::Rotation2}, whose matrix is {@code [[cos, -sin], [sin, cos]]}.
    *
-   * <p>When applied to a vector [x, y], it gives: [x', y'] = [x * cos θ - y * sin θ, x * sin θ + y
-   * * cos θ]
-   *
-   * @param angle a float
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * @param angle the rotation in radians
+   * @return the rotated vector
    */
   public Vector2D rotate(float angle) {
     float cos = (float) Math.cos(angle);
     float sin = (float) Math.sin(angle);
-    return new Vector2D(
-        x * cos - y * sin, // x' = x * cos θ - y * sin θ
-        x * sin + y * cos // y' = x * sin θ + y * cos θ
-        );
+    return new Vector2D(x * cos - y * sin, x * sin + y * cos);
   }
 
   /**
-   * Returns the angle between this vector and another vector in radians.
+   * Returns the signed angle from this vector to {@code other}.
    *
-   * @param other a {@link io.jshorelark.simulation.physics.Vector2D} object
-   * @return a float
+   * @param other the target vector
+   * @return the angle in radians, in {@code (-π, π]}
    */
   public float angle(Vector2D other) {
-    float dot = x * other.x() + y * other.y();
-    float det = x * other.y() - y * other.x();
+    float dot = x * other.x + y * other.y;
+    float det = x * other.y - y * other.x;
     return (float) Math.atan2(det, dot);
   }
 
   /**
    * Returns the squared distance to another vector.
    *
-   * @param other a {@link io.jshorelark.simulation.physics.Vector2D} object
-   * @return a float
+   * <p>Preferred over {@link #distance} in per-tick comparisons because it avoids a square root.
+   *
+   * @param other the other vector
+   * @return the squared distance
    */
   public float distanceSquared(Vector2D other) {
-    float dx = x - other.x();
-    float dy = y - other.y();
+    float dx = x - other.x;
+    float dy = y - other.y;
     return dx * dx + dy * dy;
   }
 
   /**
-   * Returns the distance to another vector.
+   * Returns the Euclidean distance to another vector.
    *
-   * @param other a {@link io.jshorelark.simulation.physics.Vector2D} object
-   * @return a float
+   * @param other the other vector
+   * @return the distance
    */
   public float distance(Vector2D other) {
     return (float) Math.sqrt(distanceSquared(other));
   }
 
   /**
-   * Wraps the coordinates between min and max (inclusive).
+   * Wraps both components into {@code [min, max)}.
    *
-   * @param min a float
-   * @param max a float
-   * @return a {@link io.jshorelark.simulation.physics.Vector2D} object
+   * <p>Mirrors {@code nalgebra::wrap}: a component equal to {@code max} wraps to {@code min}, which
+   * keeps the toroidal world a half-open square.
+   *
+   * @param min the inclusive lower bound
+   * @param max the exclusive upper bound
+   * @return the wrapped vector
    */
   public Vector2D wrap(float min, float max) {
     float range = max - min;
-    float wrappedX = ((x - min) % range + range) % range + min;
-    float wrappedY = ((y - min) % range + range) % range + min;
-    return new Vector2D(wrappedX, wrappedY);
+    return new Vector2D(wrapComponent(x, min, range), wrapComponent(y, min, range));
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Creates a copy of this vector.
-   */
-  @Override
-  public Object clone() {
-    try {
-      return super.clone();
-    } catch (CloneNotSupportedException e) {
-      throw new AssertionError("Vector2D should be cloneable", e);
-    }
+  private static float wrapComponent(float value, float min, float range) {
+    float wrapped = (value - min) % range;
+    return wrapped < 0.0f ? wrapped + range + min : wrapped + min;
   }
 }

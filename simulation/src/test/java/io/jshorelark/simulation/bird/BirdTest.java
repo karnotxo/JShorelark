@@ -48,7 +48,7 @@ class BirdTest {
   @Test
   void testRandomBirdBrain() {
     // Given
-    int[] expectedTopology = {config.getEyeCells(), config.getBrainNeurons(), 2};
+    int[] expectedTopology = {config.eyeCells(), config.brainNeurons(), 2};
     when(network.matchesTopology(expectedTopology)).thenReturn(true);
 
     // When
@@ -84,7 +84,7 @@ class BirdTest {
       1.4f // Second neuron (bias + 2 weights)
     };
     Chromosome chromosome = Chromosome.of(genes);
-    int[] expectedTopology = {config.getEyeCells(), config.getBrainNeurons(), 2};
+    int[] expectedTopology = {config.eyeCells(), config.brainNeurons(), 2};
     when(network.matchesTopology(expectedTopology)).thenReturn(true);
 
     // When
@@ -100,7 +100,7 @@ class BirdTest {
     // Given
     float[] vision = {0.5f, -0.6f, 0.7f};
     float[] networkOutput = {0.8f, 0.3f}; // Will be clamped and shifted
-    int[] topology = {config.getEyeCells(), config.getBrainNeurons(), 2};
+    int[] topology = {config.eyeCells(), config.brainNeurons(), 2};
     when(network.matchesTopology(topology)).thenReturn(true);
     when(network.propagate(vision)).thenReturn(networkOutput);
     BirdBrain brain = BirdBrain.fromNetwork(network, config, topology);
@@ -144,6 +144,6 @@ class BirdTest {
     bird.processBrain(foods, config);
 
     // Then
-    assertThat(bird.getVision()).hasSize(config.getEyeCells());
+    assertThat(bird.getVision()).hasSize(config.eyeCells());
   }
 }

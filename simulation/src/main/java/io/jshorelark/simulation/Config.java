@@ -2,98 +2,136 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-
 import lombok.Builder;
-import lombok.Value;
 import lombok.With;
 
 /**
- * Configuration for the simulation. Matches Rust's Config struct.
+ * Every tunable parameter of a simulation.
  *
- * <p>All spatial values are in model space coordinates (0.0 to 1.0).
+ * <p>Mirrors Rust's {@code Config} field for field; the defaults are the reference values. All
+ * spatial quantities are expressed in world units, where the world is the unit square.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Accessors deliberately follow record style ({@code brainNeurons()}), because this is a value
+ * type, not a bean. {@code with…} methods exist so the UI can derive a variant configuration
+ * without losing the validation performed by the canonical constructor.
+ *
+ * @param brainNeurons number of hidden neurons in each bird's brain
+ * @param eyeFovRange maximum vision distance, in world units
+ * @param eyeFovAngle total field of view, in radians
+ * @param eyeCells number of bins the field of view is split into
+ * @param foodSize collision radius of a food item, and its drawn size
+ * @param birdSize drawn size of a bird (no collision role)
+ * @param gaReverse {@code 1} selects the least fit birds instead of the fittest
+ * @param gaMutChance per-gene probability of mutation
+ * @param gaMutCoeff mutation magnitude coefficient
+ * @param simSpeedMin lower bound of the per-step speed
+ * @param simSpeedMax upper bound of the per-step speed, also each bird's spawn speed
+ * @param simSpeedAccel maximum speed change produced by one brain response
+ * @param simRotationAccel maximum rotation change produced by one brain response, in radians
+ * @param simGenerationLength number of steps a generation lasts
+ * @param worldAnimals number of birds in the world
+ * @param worldFoods number of food items in the world
  */
-@Value
-@Builder
+@Builder(toBuilder = true)
 @With
-@JsonDeserialize(builder = Config.ConfigBuilder.class)
-public class Config {
-  /** Number of neurons in each bird's brain. */
-  @Builder.Default int brainNeurons = 9;
-
-  /** Field of view range. */
-  @Builder.Default float eyeFovRange = 0.25f;
-
-  /** Field of view angle. */
-  @Builder.Default float eyeFovAngle = (float) (Math.PI + Math.PI / 4);
-
-  /** Number of eye cells in each bird. */
-  @Builder.Default int eyeCells = 9;
-
-  /** Size of food items for collision detection. */
-  @Builder.Default float foodSize = 0.01f;
-
-  /** Size of birds for collision detection. */
-  @Builder.Default float birdSize = 0.01f;
-
-  /** Whether to reverse fitness (1 = yes, 0 = no). */
-  @Builder.Default int gaReverse = 0;
-
-  /** Mutation chance for genetic algorithm. */
-  @Builder.Default float gaMutChance = 0.01f;
-
-  /** Mutation coefficient for genetic algorithm. */
-  @Builder.Default float gaMutCoeff = 0.3f;
-
-  /** Maximum simulation speed. */
-  @Builder.Default float simSpeedMax = 0.005f;
-
-  /** Minimum simulation speed. */
-  @Builder.Default float simSpeedMin = 0.001f;
-
-  /** Speed acceleration factor. */
-  @Builder.Default float simSpeedAccel = 0.2f;
-
-  /** Rotation acceleration factor in radians per step (π/2 ≈ 1.57 rad). */
-  @Builder.Default float simRotationAccel = (float) (Math.PI / 2);
-
-  /** Length of each generation in simulation steps. */
-  @Builder.Default int simGenerationLength = 2500;
-
-  /** Number of animals in the world. */
-  @Builder.Default int worldAnimals = 40;
-
-  /** Number of food items in the world. */
-  @Builder.Default int worldFoods = 60;
+public record Config(
+    int brainNeurons,
+    float eyeFovRange,
+    float eyeFovAngle,
+    int eyeCells,
+    float foodSize,
+    float birdSize,
+    int gaReverse,
+    float gaMutChance,
+    float gaMutCoeff,
+    float simSpeedMin,
+    float simSpeedMax,
+    float simSpeedAccel,
+    float simRotationAccel,
+    int simGenerationLength,
+    int worldAnimals,
+    int worldFoods) {
 
   /**
-   * Returns the default configuration.
+   * Validates the configuration.
    *
-   * @return a {@link io.jshorelark.simulation.Config} object
+   * <p>Rust asserts the eye invariants in {@code Eye::new_ex}; an invalid configuration must fail
+   * here rather than silently produce a bird that cannot see.
    */
-  public static Config getDefault() {
-    return builder().build();
+  public Config {
+    if (brainNeurons <= 0) {
+      throw new IllegalArgumentException("brainNeurons must be positive: " + brainNeurons);
+    }
+    if (eyeFovRange <= 0.0f) {
+      throw new IllegalArgumentException("eyeFovRange must be positive: " + eyeFovRange);
+    }
+    if (eyeFovAngle <= 0.0f) {
+      throw new IllegalArgumentException("eyeFovAngle must be positive: " + eyeFovAngle);
+    }
+    if (eyeCells <= 0) {
+      throw new IllegalArgumentException("eyeCells must be positive: " + eyeCells);
+    }
+    if (foodSize <= 0.0f) {
+      throw new IllegalArgumentException("foodSize must be positive: " + foodSize);
+    }
+    if (gaMutChance < 0.0f || gaMutChance > 1.0f) {
+      throw new IllegalArgumentException("gaMutChance must be in [0, 1]: " + gaMutChance);
+    }
+    if (simSpeedMin < 0.0f || simSpeedMin > simSpeedMax) {
+      throw new IllegalArgumentException("simSpeedMin must be in [0, simSpeedMax]: " + simSpeedMin);
+    }
+    if (simRotationAccel < 0.0f) {
+      throw new IllegalArgumentException(
+          "simRotationAccel must not be negative: " + simRotationAccel);
+    }
+    if (simGenerationLength <= 0) {
+      throw new IllegalArgumentException(
+          "simGenerationLength must be positive: " + simGenerationLength);
+    }
+    if (worldAnimals < 0 || worldFoods < 0) {
+      throw new IllegalArgumentException(
+          "worldAnimals and worldFoods must not be negative: " + worldAnimals + ", " + worldFoods);
+    }
   }
 
   /**
-   * Returns the brain topology array [eyeCells, brainNeurons, 2].
+   * Returns the reference configuration, matching Rust's {@code Config::default}.
    *
-   * @return an array of {@link int} objects
+   * @return the default configuration
    */
-  public int[] getBrainTopology() {
+  public static Config defaults() {
+    return builder()
+        .brainNeurons(9)
+        .eyeFovRange(0.25f)
+        .eyeFovAngle((float) (Math.PI + Math.PI / 4))
+        .eyeCells(9)
+        .foodSize(0.01f)
+        .birdSize(0.01f)
+        .gaReverse(0)
+        .gaMutChance(0.01f)
+        .gaMutCoeff(0.3f)
+        .simSpeedMin(0.001f)
+        .simSpeedMax(0.005f)
+        .simSpeedAccel(0.2f)
+        .simRotationAccel((float) (Math.PI / 2))
+        .simGenerationLength(2500)
+        .worldAnimals(40)
+        .worldFoods(60)
+        .build();
+  }
+
+  /**
+   * Returns the network topology implied by this configuration.
+   *
+   * <p>A fresh array is returned on every call so callers cannot mutate shared state.
+   *
+   * @return {@code [eyeCells, brainNeurons, 2]}
+   */
+  public int[] brainTopology() {
     return new int[] {eyeCells, brainNeurons, 2};
-  }
-
-  @JsonPOJOBuilder(withPrefix = "")
-  public static class ConfigBuilder {
-    // Builder will be generated by Lombok
   }
 }

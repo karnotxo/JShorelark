@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclusions for JShorelark.
+
+  Every match needs a reason. The filter is deliberately narrow: a blanket package exclusion would
+  hide the very defects (mutable exposed state, null handling) this project cares about.
+-->
+<FindBugsFilter>
+
+  <!--
+    Generated builders (Lombok @Builder, @RecordBuilder) are code we do not own. Their setter-based
+    construction triggers EI_EXPOSE_REP2 on every mutable field even when the built type is immutable.
+  -->
+  <Match>
+    <Class name="~.*Builder" />
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2,UWF_UNWRITTEN_FIELD,NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR" />
+  </Match>
+
+  <Match>
+    <Class name="~.*\.generated\..*" />
+  </Match>
+
+  <!--
+    Jackson deserialises the optimizer's JSONL format into these value types. Their JSON property
+    names are a persisted contract, so the field naming cannot be changed to satisfy NM_FIELD_NAMING.
+  -->
+  <Match>
+    <Class name="io.jshorelark.optimizer.OptimizationConfig" />
+    <Bug pattern="URF_UNREAD_FIELD" />
+  </Match>
+
+</FindBugsFilter>

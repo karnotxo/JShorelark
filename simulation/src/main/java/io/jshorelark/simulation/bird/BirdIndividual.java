@@ -2,89 +2,130 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.bird;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
 
 import io.jshorelark.genetic.Chromosome;
 import io.jshorelark.genetic.Individual;
 import io.jshorelark.simulation.Config;
 
-import lombok.Getter;
-
 /**
- * Represents a bird individual for genetic algorithm.
+ * A bird seen as a genetic-algorithm individual: its chromosome plus the fitness it earned.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Mirrors Rust's {@code AnimalIndividual}. The fitness is captured once, when the individual is
+ * created from a bird, so later mutations of the bird cannot change a finished generation's score.
+ * Reversing the fitness (the {@code ga_reverse} experiment) is then a matter of rewriting that
+ * captured value, exactly as Rust does.
  */
-public class BirdIndividual implements Individual {
-  /** The bird being wrapped. */
-  private final Bird bird;
+public final class BirdIndividual implements Individual {
 
-  /** The config for the simulation. */
-  @Getter private final Config config;
+  /** Chromosome of the bird that earned this fitness. */
+  private final Chromosome chromosome;
 
-  /**
-   * Creates a new individual with the given bird and config.
-   *
-   * @param bird a {@link io.jshorelark.simulation.bird.Bird} object
-   * @param config a {@link io.jshorelark.simulation.Config} object
-   */
-  public BirdIndividual(Bird bird, Config config) {
-    this.bird = bird.clone();
-    this.config = config;
-  }
+  /** Captured fitness (satiation, or its reverse). */
+  private final float fitness;
 
-  /** {@inheritDoc} */
-  @Override
-  public float getFitness() {
-    return bird.getSatiation();
-  }
+  /** Configuration used to rebuild a bird from the chromosome. */
+  private final Config config;
 
-  /** {@inheritDoc} */
-  @Override
-  public Chromosome getChromosome() {
-    return bird.toChromosome();
+  private BirdIndividual(Chromosome chromosome, float fitness, Config config) {
+    this.chromosome = Objects.requireNonNull(chromosome, "chromosome");
+    this.fitness = fitness;
+    this.config = Objects.requireNonNull(config, "config");
   }
 
   /**
-   * Creates a new individual from a chromosome.
+   * Captures a bird's chromosome and current satiation as a new individual.
    *
-   * @param chromosome a {@link io.jshorelark.genetic.Chromosome} object
-   * @param config a {@link io.jshorelark.simulation.Config} object
-   * @return a {@link io.jshorelark.simulation.bird.BirdIndividual} object
-   */
-  public static BirdIndividual fromChromosome(Chromosome chromosome, Config config) {
-    return new BirdIndividual(
-        Bird.fromChromosome(config, new java.util.Random(), chromosome), config);
-  }
-
-  /**
-   * Creates a new individual from a bird.
-   *
-   * @param bird a {@link io.jshorelark.simulation.bird.Bird} object
-   * @return a {@link io.jshorelark.simulation.bird.BirdIndividual} object
+   * @param bird the bird to capture
+   * @return the individual representing that bird's performance
    */
   public static BirdIndividual of(Bird bird) {
-    return new BirdIndividual(bird, bird.getConfig());
+    Objects.requireNonNull(bird, "bird");
+    return new BirdIndividual(bird.toChromosome(), bird.getSatiation(), bird.getConfig());
   }
 
   /**
-   * Converts this individual back to a bird.
+   * Creates an unevaluated individual from a chromosome.
    *
-   * @return a {@link io.jshorelark.simulation.bird.Bird} object
+   * <p>Used when a new population has to be built without a preceding evaluation.
+   *
+   * @param chromosome the chromosome
+   * @param config the configuration for the bird this individual will produce
+   * @return an individual with zero fitness
    */
-  public Bird toBird() {
-    return bird.withChromosome(getChromosome());
+  public static BirdIndividual fromChromosome(Chromosome chromosome, Config config) {
+    return new BirdIndividual(chromosome, 0.0f, config);
   }
 
-  /** Factory for creating BirdIndividuals from chromosomes. */
-  public static class Factory implements Individual.Factory<BirdIndividual> {
+  /**
+   * Returns a copy of this individual with the given fitness.
+   *
+   * @param newFitness the replacement fitness
+   * @return a new individual sharing the same chromosome
+   */
+  public BirdIndividual withFitness(float newFitness) {
+    return new BirdIndividual(chromosome, newFitness, config);
+  }
+
+  /**
+   * Inverts every fitness against the best one in the population.
+   *
+   * <p>Mirrors Rust's {@code ga_reverse == 1} branch: {@code fitness = max_satiation - fitness},
+   * which turns selection into "survival of the worst".
+   *
+   * @param individuals the evaluated population
+   * @return a new list with inverted fitness values
+   */
+  public static List<BirdIndividual> reverseFitness(List<BirdIndividual> individuals) {
+    if (individuals.isEmpty()) {
+      return List.of();
+    }
+    float maxFitness =
+        individuals.stream().map(BirdIndividual::getFitness).max(Float::compare).orElseThrow();
+    return individuals.stream().map(i -> i.withFitness(maxFitness - i.fitness)).toList();
+  }
+
+  @Override
+  public Chromosome getChromosome() {
+    return chromosome;
+  }
+
+  @Override
+  public float getFitness() {
+    return fitness;
+  }
+
+  /**
+   * Builds the bird that carries this individual's chromosome.
+   *
+   * <p>The returned bird starts at a fresh random position and rotation, as in Rust's
+   * {@code AnimalIndividual::into_animal}.
+   *
+   * @param random the random source for the new bird's placement
+   * @return a new bird with this chromosome
+   */
+  public Bird toBird(Random random) {
+    return Bird.fromChromosome(config, random, chromosome);
+  }
+
+  /** Factory that rebuilds individuals from chromosomes for the genetic algorithm. */
+  public static final class Factory implements Individual.Factory<BirdIndividual> {
+
     private final Config config;
 
+    /**
+     * Creates a factory bound to a configuration.
+     *
+     * @param config the configuration for the birds it will produce
+     */
     public Factory(Config config) {
-      this.config = config;
+      this.config = Objects.requireNonNull(config, "config");
     }
 
     @Override

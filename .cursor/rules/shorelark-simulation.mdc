@@ -1,0 +1,189 @@
+---
+description: Simulation domain - toroidal world, bird physics, vision, collisions, generation lifecycle
+globs: simulation/**/*.java,optimizer/**/*.java
+alwaysApply: false
+---
+
+# Simulation Domain
+
+The `simulation` module is the heart of the port. It must match the Rust `libs/simulation` crate
+behaviour exactly, and stay pure Java (no JavaFX, no I/O, no threads).
+
+## Coordinates and world model
+
+- The world is the unit square `[0, 1) × [0, 1)`, **toroidal**: crossing an edge wraps around.
+  `Vector2D#wrap(min, max)` and `Bird#processMovement` own the wrapping; nowhere else should
+  re-implement it.
+- Positions are `Vector2D` (immutable value object with `x()` / `y()`).
+- Rust uses `nalgebra::Point2<f32>` and `nalgebra::wrap`. Java's equivalent is a plain `Vector2D`
+  plus explicit wrap calls. Model-space Y grows **upward**; the JavaFX renderer flips it
+  (`(1 - y) * scale`). Never flip Y in the domain.
+- `Vector2D#distanceSquared` is the fast path; use it in every per-tick comparison and take the
+  square root only when the value itself is needed (vision strength).
+
+## Rotation
+
+Rust keeps a `na::Rotation2<f32>`:
+
+```rust
+self.position += self.rotation * na::Vector2::new(0.0, self.speed);
+```
+
+Meaning: **rotation 0 points along +Y**, positive rotation is counter-clockwise. Java keeps a plain
+`float rotation` in radians with the same convention: 0 = +Y, CCW positive.
+
+- One conversion point only. If the renderer needs a screen angle, compute it in the renderer
+  (`Math.toDegrees(rotation) - 90` for JavaFX Canvas, whose 0° is +X and whose positive direction is
+  clockwise).
+- Normalise rotation into `[0, 2π)` when storing it, and wrap the *difference* when comparing
+  angles.
+- Angle to a food item is measured from +Y: `atan2(vec.x(), vec.y())`. This mirrors
+  `Rotation2::rotation_between(&Vector2::y(), &vec)`. Using `atan2(vec.y(), vec.x())` rotates the
+  whole vision fan by 90° and silently breaks learning.
+
+## Bird lifecycle
+
+| Concern | Owner | Rust counterpart |
+|---|---|---|
+| Random spawn (position, rotation, speed, brain) | `Bird.random` | `Animal::random` |
+| Spawn with an evolved brain | `Bird.fromChromosome` | `Animal::from_chromosome` |
+| Vision | `BirdEye#processVision` | `Eye::process_vision` |
+| Think + steer | `Bird#processBrain` → `BirdBrain#processInputs` | `Animal::process_brain`, `Brain::propagate` |
+| Move + wrap | `Bird#processMovement` | `Animal::process_movement` |
+| Eat | `Bird#eat` (satiation++) | `process_collisions` |
+| Weights | `Bird#toChromosome` | `Animal::as_chromosome` |
+
+Rules:
+
+- Spawn speed is `config.sim_speed_max`, not the minimum.
+- Spawn rotation is uniform in `[0, 2π)`.
+- Vision is recomputed **before** the brain runs, inside the same step, and stored on the bird so
+  the renderer can display the current sensors without recomputing them.
+- `previousPosition` exists only for trail rendering; it must not influence physics.
+
+## Brain output
+
+Rust:
+
+```rust
+let speed     = response[0].clamp(0.0, 2.0) - 1.0;
+let rotation  = response[1].clamp(0.0, 2.0) - 1.0;
+let speed     = speed.clamp(-self.speed_accel, self.speed_accel);
+let rotation  = rotation.clamp(-self.rotation_accel, self.rotation_accel);
+```
+
+Java must reproduce the two-stage clamp exactly: first map the raw ReLU output into `[-1, 1]` by
+clamping to `[0, 2]` and subtracting 1, then clamp by the acceleration limits. A single
+`clamp(-1, 1)` looks equivalent but is not, because the first clamp caps values above 1 before the
+subtraction.
+
+The two outputs are then applied to the bird: `speed` is added to the current speed and clamped to
+`[sim_speed_min, sim_speed_max]`; `rotation` is added to the current rotation and normalised.
+
+## Vision
+
+- FOV has `eye_cells` bins spanning `eye_fov_angle` radians centred on the current heading.
+- A food item contributes `(fov_range - distance) / fov_range` to exactly one bin; several items in
+  the same bin accumulate.
+- Food outside `fov_range` is ignored. Angle is wrapped to `[-π, π]` before the FOV test.
+- The cell index is `((angle + fov_angle/2) / fov_angle * cells)` truncated, capped at `cells - 1`.
+- `fov_angle > 2π` is legal (the default is `π + π/4` ≈ 2.356) and is why the Rust tests show
+  overlapping fans for large angles.
+- Port the Rust eye tests as a table-driven test: they encode the expected ASCII vision grid for
+  varying range, angle, position and rotation.
+
+## Collisions
+
+Rust:
+
+```rust
+if distance <= self.config.food_size { animal.satiation += 1; food.position = rng.gen(); }
+```
+
+- The radius is **`food_size` only**. There is no bird radius in the collision test.
+- A consumed food is respawned immediately at a random position (not removed), so the food count is
+  constant during a generation.
+- The collision loop is bird-major: each bird scans all food; a food can feed several birds in the
+  same tick.
+- Emit a `CollisionEvent` snapshot for the UI at the moment of eating; the event is presentation
+  data and must not be required by any rule.
+
+## Generation lifecycle
+
+Rust `Simulation` owns the clock:
+
+```rust
+fn step(&mut self, rng) -> Option<Statistics> {
+  self.process_collisions(rng);
+  self.process_brains();
+  self.process_movements();
+  self.try_evolving(rng)
+}
+
+fn try_evolving(&mut self, rng) -> Option<Statistics> {
+  self.age += 1;
+  if self.age > self.config.sim_generation_length { Some(self.evolve(rng)) } else { None }
+}
+```
+
+Consequences the Java port must honour:
+
+1. The step order is fixed: collisions → brains → movements → evolution check.
+2. `age` counts steps; **satiation is fitness, never the clock**. A bird that never eats must still
+   cause the generation to end.
+3. Rust evolves on `age > length`, so a generation lasts `length + 1` steps. Pick one convention,
+   document it, and test it.
+4. On evolve: age resets to 0, generation increments, the reported `Statistics.generation` is the
+   just-finished generation (`generation - 1` in Rust), animals are replaced by evolved individuals,
+   and every food is repositioned randomly.
+5. `train(rng)` is `step` in a loop until a generation completes; it must not spin forever when the
+   population is empty — fail fast with an explanatory exception.
+6. `ga_reverse == 1` inverts fitness as `max_satiation - fitness` before selection. Implement it in
+   the evolution step, not in `Statistics`.
+
+## Fitness and statistics
+
+- Fitness of a `BirdIndividual` is its satiation (a count, stored as `float` to match Rust).
+- `io.jshorelark.genetic.statistics.Statistics` computes min / max / average / median in **one**
+  pass plus a sort for the median; even sizes average the two middle values.
+- Do not re-derive statistics in the UI or the optimizer. Both consume the domain value.
+
+## Configuration
+
+`Config` is the single source of truth for simulation parameters and mirrors Rust's `Config`
+field-for-field:
+
+| Property | Default | Meaning |
+|---|---|---|
+| `brainNeurons` | 9 | hidden neurons |
+| `eyeFovRange` | 0.25 | vision range in world units |
+| `eyeFovAngle` | π + π/4 | total field of view (radians) |
+| `eyeCells` | 9 | vision bins |
+| `foodSize` | 0.01 | collision radius and food draw size |
+| `birdSize` | 0.01 | rendering size only (no Rust counterpart) |
+| `gaReverse` | 0 | 1 flips fitness before selection |
+| `gaMutChance` | 0.01 | per-gene mutation probability |
+| `gaMutCoeff` | 0.3 | mutation magnitude coefficient |
+| `simSpeedMin` | 0.001 | lower speed clamp |
+| `simSpeedMax` | 0.005 | upper speed clamp and spawn speed |
+| `simSpeedAccel` | 0.2 | per-step speed delta limit |
+| `simRotationAccel` | π/2 | per-step rotation delta limit |
+| `simGenerationLength` | 2500 | steps per generation |
+| `worldAnimals` | 40 | population size |
+| `worldFoods` | 60 | food items |
+
+- Every field is validated at construction (`eyeCells > 0`, `eyeFovRange > 0`, `0 ≤ gaMutChance ≤ 1`,
+  `simSpeedMin ≤ simSpeedMax`). Fail loudly; a silent clamp hides configuration bugs.
+- A new knob must be added to the Rust-reference table above, to `Config`, and to `TO-DO.md` if it
+  has no Rust counterpart.
+- `getBrainTopology()` returns a **new** array each call (`[eyeCells, brainNeurons, 2]`) so callers
+  cannot mutate shared state.
+
+## Anti-patterns
+
+- Deriving "generation finished" from satiation, from the UI timer, or from food count.
+- Re-implementing wrapping in the renderer or in `BirdEye`.
+- Using `Math.random()` or a per-call `new Random()`.
+- Storing `double` in simulation state.
+- Letting `Simulation` know about JavaFX, files, or logging frameworks beyond SLF4J.
+- Changing the step order (it changes learning dynamics and breaks golden tests).

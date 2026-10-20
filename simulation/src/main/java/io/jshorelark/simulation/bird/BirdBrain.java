@@ -2,10 +2,11 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.bird;
 
+import java.util.Objects;
 import java.util.Random;
 
 import io.jshorelark.genetic.Chromosome;
@@ -14,88 +15,101 @@ import io.jshorelark.neural.NeuralNetwork;
 import io.jshorelark.simulation.Config;
 
 /**
- * The brain of a bird, controlling its movement based on visual input.
+ * Turns vision into the two control values a bird uses: speed and rotation deltas.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Mirrors Rust's {@code Brain}. The network has topology {@code [eyeCells, brainNeurons, 2]};
+ * this class owns the mapping from the two raw network outputs to bounded control values.
  */
 public final class BirdBrain {
-  private final LayeredNetwork network;
-  private final Config config;
 
-  /** Creates a new bird brain with the given network and config. */
+  private final LayeredNetwork network;
+  private final float speedAccel;
+  private final float rotationAccel;
+
   private BirdBrain(LayeredNetwork network, Config config) {
-    this.network = network;
-    this.config = config;
+    this.network = Objects.requireNonNull(network, "network");
+    this.speedAccel = config.simSpeedAccel();
+    this.rotationAccel = config.simRotationAccel();
   }
 
   /**
-   * Creates a new random bird brain.
+   * Creates a brain with a random network.
    *
-   * @param random a {@link java.util.Random} object
-   * @param config a {@link io.jshorelark.simulation.Config} object
-   * @return a {@link io.jshorelark.simulation.bird.BirdBrain} object
+   * @param random the random source for the weights
+   * @param config the simulation configuration
+   * @return a randomly initialised brain
    */
   public static BirdBrain random(Random random, Config config) {
-    int[] topology = {config.getEyeCells(), config.getBrainNeurons(), 2};
-    return new BirdBrain(NeuralNetwork.random(random, topology), config);
+    return new BirdBrain(NeuralNetwork.random(random, config.brainTopology()), config);
   }
 
   /**
-   * Creates a new bird brain from a chromosome.
+   * Creates a brain by decoding a chromosome into network weights.
    *
-   * @param chromosome a {@link io.jshorelark.genetic.Chromosome} object
-   * @param config a {@link io.jshorelark.simulation.Config} object
-   * @return a {@link io.jshorelark.simulation.bird.BirdBrain} object
+   * @param chromosome the chromosome holding the weights
+   * @param config the simulation configuration
+   * @return the decoded brain
+   * @throws IllegalArgumentException if the chromosome does not match the configured topology
    */
   public static BirdBrain fromChromosome(Chromosome chromosome, Config config) {
-    int[] topology = {config.getEyeCells(), config.getBrainNeurons(), 2};
-    return new BirdBrain(NeuralNetwork.fromWeights(topology, chromosome.getGenes()), config);
+    return new BirdBrain(
+        NeuralNetwork.fromWeights(config.brainTopology(), chromosome.getGenes()), config);
   }
 
   /**
-   * Creates a new bird brain from a neural network.
+   * Creates a brain around an existing network.
    *
-   * @param network a {@link io.jshorelark.neural.LayeredNetwork} object
-   * @param config a {@link io.jshorelark.simulation.Config} object
-   * @param topology an array of {@link int} objects
-   * @return a {@link io.jshorelark.simulation.bird.BirdBrain} object
+   * @param network the network to use
+   * @param config the simulation configuration
+   * @return the brain
+   * @throws IllegalArgumentException if the network topology does not match the configuration
    */
-  public static BirdBrain fromNetwork(LayeredNetwork network, Config config, int[] topology) {
-    if (!network.matchesTopology(topology)) {
-      throw new IllegalArgumentException("Network topology does not match expected topology");
+  public static BirdBrain fromNetwork(LayeredNetwork network, Config config) {
+    if (!network.matchesTopology(config.brainTopology())) {
+      throw new IllegalArgumentException(
+          "Network topology does not match the configured brain topology");
     }
     return new BirdBrain(network, config);
   }
 
   /**
-   * Processes the visual input and returns speed and rotation adjustments.
+   * Converts a vision vector into a speed delta and a rotation delta.
    *
-   * @param vision an array of {@link float} objects
-   * @return an array of {@link float} objects
+   * <p>Mirrors Rust's {@code Brain::propagate} exactly. Output 0 is the speed control and output 1
+   * is the rotation control; each is clamped to {@code [0, 2]} and shifted by {@code -1} to obtain
+   * {@code [-1, 1]}, then clamped once more by its acceleration limit. The two controls are
+   * independent: an earlier port added and subtracted them, which is not what the reference does and
+   * changes the meaning of the network's outputs.
+   *
+   * @param vision one strength value per eye cell
+   * @return a two-element array: {@code [speedDelta, rotationDelta]}
    */
   public float[] processInputs(float[] vision) {
     float[] response = network.propagate(vision);
 
-    // Clamp responses between 0 and 1, then shift to -0.5 to 0.5 range
-    float r0 = Math.min(1.0f, Math.max(0.0f, response[0])) - 0.5f;
-    float r1 = Math.min(1.0f, Math.max(0.0f, response[1])) - 0.5f;
+    float speed = Math.clamp(response[0], 0.0f, 2.0f) - 1.0f;
+    float rotation = Math.clamp(response[1], 0.0f, 2.0f) - 1.0f;
 
-    // Calculate speed and rotation adjustments
-    float speed =
-        Math.min(config.getSimSpeedAccel(), Math.max(-config.getSimSpeedAccel(), r0 + r1));
-    float rotation =
-        Math.min(config.getSimRotationAccel(), Math.max(-config.getSimRotationAccel(), r0 - r1));
-
+    speed = Math.clamp(speed, -speedAccel, speedAccel);
+    rotation = Math.clamp(rotation, -rotationAccel, rotationAccel);
     return new float[] {speed, rotation};
   }
 
   /**
-   * Gets the chromosome representation of this brain.
+   * Returns the weight vector that encodes this brain.
    *
-   * @return a {@link io.jshorelark.genetic.Chromosome} object
+   * @return the chromosome
    */
   public Chromosome toChromosome() {
-    return Chromosome.of(network.weights());
+    return network.toChromosome();
+  }
+
+  /**
+   * Returns the underlying network.
+   *
+   * @return the network
+   */
+  public LayeredNetwork getNetwork() {
+    return network;
   }
 }

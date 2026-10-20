@@ -73,8 +73,8 @@ class WorldTest {
     void createsRandomWorld() {
       var world = World.random(config, random);
 
-      assertThat(world.getBirds()).hasSize(config.getWorldAnimals());
-      assertThat(world.getFoods()).hasSize(config.getWorldFoods());
+      assertThat(world.getBirds()).hasSize(config.worldAnimals());
+      assertThat(world.getFoods()).hasSize(config.worldFoods());
       assertThat(world.getConfig()).isEqualTo(config);
     }
   }

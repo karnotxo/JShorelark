@@ -2,98 +2,132 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.bird;
 
 import java.util.List;
-
-import org.apache.commons.math3.util.FastMath;
+import java.util.Objects;
 
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
 
 /**
- * Represents a bird's eye that can see food.
+ * The bird's segmented field of view.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Mirrors Rust's {@code Eye}: the field of view is split into {@code eyeCells} equal bins; each
+ * visible food item adds {@code (fovRange - distance) / fovRange} to exactly one bin, so nearer food
+ * produces a stronger signal. The strength is a pure function of geometry and is what the brain
+ * consumes as input.
  */
-public class BirdEye {
-  /** Field of view range. */
+public final class BirdEye {
+
   private final float fovRange;
-
-  /** Field of view angle in radians. */
   private final float fovAngle;
-
-  /** Number of cells in the eye. */
   private final int cells;
 
   /**
-   * Creates a new bird eye.
+   * Creates an eye configured from the simulation configuration.
    *
-   * @param config a {@link io.jshorelark.simulation.Config} object
+   * @param config the simulation configuration
+   * @throws IllegalArgumentException if the field of view range, angle or cell count is not positive
    */
   public BirdEye(Config config) {
-    this.fovRange = config.getEyeFovRange();
-    this.fovAngle = config.getEyeFovAngle();
-    this.cells = config.getEyeCells();
+    Objects.requireNonNull(config, "config");
+    if (config.eyeFovRange() <= 0.0f) {
+      throw new IllegalArgumentException("eyeFovRange must be positive");
+    }
+    if (config.eyeFovAngle() <= 0.0f) {
+      throw new IllegalArgumentException("eyeFovAngle must be positive");
+    }
+    if (config.eyeCells() <= 0) {
+      throw new IllegalArgumentException("eyeCells must be positive");
+    }
+    this.fovRange = config.eyeFovRange();
+    this.fovAngle = config.eyeFovAngle();
+    this.cells = config.eyeCells();
   }
 
   /**
-   * Processes vision based on position, rotation, and visible food.
+   * Builds the vision vector for a position and heading.
    *
-   * @param position a {@link io.jshorelark.simulation.physics.Vector2D} object
-   * @param rotation a float
-   * @param foods a {@link java.util.List} object
-   * @return an array of {@link float} objects
+   * <p>Mirrors Rust's {@code Eye::process_vision} exactly:
+   *
+   * <ol>
+   *   <li>the angle to the food is measured from +Y ({@code atan2(vec.x, vec.y)}), because that is
+   *       what {@code Rotation2::rotation_between(&Vector2::y(), &vec)} produces;
+   *   <li>the heading is subtracted and the result wrapped into {@code [-π, π]};
+   *   <li>food outside the field of view is skipped;
+   *   <li>the remaining angle is shifted into {@code [0, fovAngle]} to pick a bin.
+   * </ol>
+   *
+   * @param position the bird's position
+   * @param rotation the bird's heading in radians
+   * @param foods the food items to look at
+   * @return one strength value per cell
    */
   public float[] processVision(Vector2D position, float rotation, List<Food> foods) {
     float[] vision = new float[cells];
+    float halfAngle = fovAngle / 2.0f;
 
     for (Food food : foods) {
-      // Calculate vector to food
-      Vector2D vec = food.getPosition().subtract(position);
-      float dist = vec.length();
-
-      // Skip if food is out of range
-      if (dist > fovRange) {
+      Vector2D offset = food.getPosition().subtract(position);
+      float distance = offset.length();
+      if (distance > fovRange) {
         continue;
       }
 
-      // Calculate angle to food relative to X axis (right)
-      // In Rust, atan2(y, x) gives angle from positive X axis, CCW
-      float angle = (float) FastMath.atan2(vec.x(), vec.y());
+      // Angle from +Y, matching Rotation2::rotation_between(&Vector2::y(), &vec).
+      float angle = (float) Math.atan2(offset.x(), offset.y()) - rotation;
+      angle = wrapAngle(angle);
 
-      // Adjust for bird's rotation (also CCW from X axis)
-      angle -= rotation;
-
-      // Wrap to [-π, π]
-      angle = wrap(angle, -(float) FastMath.PI, (float) FastMath.PI);
-
-      // Skip if food is outside field of view
-      if (angle < -fovAngle / 2 || angle > fovAngle / 2) {
+      if (angle < -halfAngle || angle > halfAngle) {
         continue;
       }
 
-      // Map angle to cell
-      angle += fovAngle / 2;
-      float cellF = angle / fovAngle * cells;
-      int cell = Math.min((int) cellF, cells - 1);
-
-      // Add food strength to cell based on distance
-      vision[cell] += (fovRange - dist) / fovRange;
+      float shifted = angle + halfAngle;
+      int cell = Math.min((int) (shifted / fovAngle * cells), cells - 1);
+      vision[cell] += (fovRange - distance) / fovRange;
     }
 
     return vision;
   }
 
-  /** Wraps an angle to the range [min, max]. */
-  private float wrap(float value, float min, float max) {
-    float range = max - min;
-    float offset = value - min;
-    float wrapped = ((offset % range) + range) % range;
-    return wrapped + min;
+  /**
+   * Returns the number of vision cells.
+   *
+   * @return the cell count
+   */
+  public int getCells() {
+    return cells;
+  }
+
+  /**
+   * Returns the total field of view in radians.
+   *
+   * @return the field of view angle
+   */
+  public float getFovAngle() {
+    return fovAngle;
+  }
+
+  /**
+   * Returns the maximum vision distance in world units.
+   *
+   * @return the field of view range
+   */
+  public float getFovRange() {
+    return fovRange;
+  }
+
+  /** Wraps an angle into {@code [-π, π]}, matching {@code nalgebra::wrap}. */
+  private static float wrapAngle(float angle) {
+    float twoPi = (float) (2 * Math.PI);
+    float wrapped = (angle + (float) Math.PI) % twoPi;
+    if (wrapped < 0.0f) {
+      wrapped += twoPi;
+    }
+    return wrapped - (float) Math.PI;
   }
 }
