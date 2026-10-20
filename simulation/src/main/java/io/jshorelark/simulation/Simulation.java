@@ -93,7 +93,7 @@ public class Simulation {
       boolean wasConsumed = false;
       for (Bird bird : world.getBirds()) {
         float distance = bird.getPosition().distance(food.getPosition());
-        float collisionThreshold = config.getBirdSize() + config.getFoodSize();
+        float collisionThreshold = config.getBirdSize() + config.foodSize();
         if (distance <= collisionThreshold) {
           bird.eat();
           wasConsumed = true;
