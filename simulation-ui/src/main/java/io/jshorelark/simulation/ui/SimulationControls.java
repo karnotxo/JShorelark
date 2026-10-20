@@ -2,10 +2,12 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.ui;
 
+import io.jshorelark.simulation.ui.controls.ControlBuilder;
+import io.jshorelark.simulation.ui.icons.SvgIcons;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.geometry.Insets;
@@ -24,10 +26,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-
-import io.jshorelark.simulation.ui.controls.ControlBuilder;
-import io.jshorelark.simulation.ui.icons.SvgIcons;
-
 import lombok.extern.slf4j.Slf4j;
 
 /**

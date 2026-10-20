@@ -2,22 +2,20 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.physics;
 
-import java.util.Random;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.food.Food;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import java.util.Random;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
 @DisplayName("World")
 class WorldTest {
@@ -27,7 +25,7 @@ class WorldTest {
   @BeforeEach
   void setUp() {
     random = new Random(42); // Fixed seed for reproducibility
-    config = Config.getDefault();
+    config = Config.defaults();
   }
 
   @Nested
@@ -37,7 +35,7 @@ class WorldTest {
 
     @BeforeEach
     void setUp() {
-      world = World.builder().config(config).build();
+      world = World.empty(config);
     }
 
     @Test

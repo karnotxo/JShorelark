@@ -2,21 +2,19 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.genetic;
 
-import java.util.List;
-import java.util.Random;
-
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import io.jshorelark.genetic.crossover.UniformCrossover;
 import io.jshorelark.genetic.mutation.GaussianMutation;
 import io.jshorelark.genetic.selection.RouletteWheelSelection;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import java.util.List;
+import java.util.Random;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 @DisplayName("GeneticAlgorithm")
 class GeneticAlgorithmTest {

@@ -2,10 +2,11 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.ui;
 
+import io.jshorelark.simulation.ui.icons.AppIcon;
 import java.util.Random;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
@@ -28,8 +29,6 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
-
-import io.jshorelark.simulation.ui.icons.AppIcon;
 
 /**
  * Splash screen shown during application startup.
@@ -111,9 +110,6 @@ public class SplashScreen extends Preloader {
     this.stage = new StageWrapper(stage);
     this.startTime = System.currentTimeMillis();
 
-    // Create background with animated particles
-    var background = createAnimatedBackground();
-
     // Create main layout
     var layout = new VBox(40);
     layout.setAlignment(Pos.CENTER);
@@ -141,8 +137,8 @@ public class SplashScreen extends Preloader {
     status.getStyleClass().addAll("splash-status", "splash-status-large");
     layout.getChildren().add(status);
 
-    // Create root layout with background
-    var root = new StackPane(background, layout);
+    // Create root layout with animated background
+    var root = new StackPane(createAnimatedBackground(), layout);
     root.getStyleClass().add("splash-root");
 
     // Create scene with doubled size
@@ -298,20 +294,14 @@ public class SplashScreen extends Preloader {
   @Override
   public void handleApplicationNotification(PreloaderNotification info) {
     if (info instanceof StatusNotification notification) {
-      status.setText(notification.getStatus());
+      status.setText(notification.status());
     }
   }
 
-  /** Status notification for updating splash screen text. */
-  public static class StatusNotification implements PreloaderNotification {
-    private final String status;
-
-    public StatusNotification(String status) {
-      this.status = status;
-    }
-
-    public String getStatus() {
-      return status;
-    }
-  }
+  /**
+   * Status notification for updating splash screen text.
+   *
+   * @param status the message shown under the progress bar
+   */
+  public record StatusNotification(String status) implements PreloaderNotification {}
 }

@@ -2,20 +2,9 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.ui;
-
-import java.util.Random;
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyBooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanWrapper;
-import javafx.geometry.Insets;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.stage.Stage;
 
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.events.CollisionEvent;
@@ -23,7 +12,24 @@ import io.jshorelark.simulation.ui.audio.SoundManager;
 import io.jshorelark.simulation.ui.dialogs.AboutDialog;
 import io.jshorelark.simulation.ui.evolution.EvolutionManager;
 import io.jshorelark.simulation.ui.icons.AppIcon;
-
+import java.util.Random;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.beans.property.ReadOnlyBooleanProperty;
+import javafx.beans.property.ReadOnlyBooleanWrapper;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.CheckMenuItem;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -54,10 +60,21 @@ public class SimulationApplication extends Application {
       return manager.getStatistics();
     }
 
+    /**
+     * Advances the wrapped manager by one step.
+     *
+     * @param random the random source
+     */
     public void update(Random random) {
       manager.update(random);
     }
 
+    /**
+     * Adds food to the wrapped manager.
+     *
+     * @param count how many items to add
+     * @param random the random source
+     */
     public void addFoods(int count, Random random) {
       manager.addFoods(count, random);
     }
@@ -205,7 +222,7 @@ public class SimulationApplication extends Application {
    */
   public float getBestFitness() {
     var stats = evolutionManager.getStatistics();
-    return stats != null ? stats.getMaxFitness() : 0.0f;
+    return stats != null ? stats.maxFitness() : 0.0f;
   }
 
   /**
@@ -396,7 +413,6 @@ public class SimulationApplication extends Application {
               }
             });
 
-    Menu viewMenu = new Menu("View");
     var themeMenuItem = new CheckMenuItem("Dark Theme");
     themeMenuItem.setSelected(darkTheme);
     themeMenuItem.setOnAction(e -> toggleTheme());
@@ -409,8 +425,7 @@ public class SimulationApplication extends Application {
           soundManager.setEnabled(soundEnabled);
         });
 
-    viewMenu.getItems().addAll(themeMenuItem, soundMenuItem);
-
+    Menu viewMenu = new Menu("View", null, themeMenuItem, soundMenuItem);
     Menu helpMenu = new Menu("Help");
     helpMenu
         .getItems()
@@ -470,11 +485,11 @@ public class SimulationApplication extends Application {
         handleGenerationComplete();
         println(stats.toString());
         fitnessChart.update(
-            stats.getGeneration(),
-            stats.getMaxFitness(),
-            stats.getAvgFitness(),
-            stats.getMedianFitness(),
-            stats.getMinFitness());
+            stats.generation(),
+            stats.maxFitness(),
+            stats.avgFitness(),
+            stats.medianFitness(),
+            stats.minFitness());
       }
     }
 
@@ -610,11 +625,11 @@ public class SimulationApplication extends Application {
       var stats = evolutionManager.train(random);
       println(stats.toString());
       fitnessChart.update(
-          stats.getGeneration(),
-          stats.getMaxFitness(),
-          stats.getAvgFitness(),
-          stats.getMedianFitness(),
-          stats.getMinFitness());
+          stats.generation(),
+          stats.maxFitness(),
+          stats.avgFitness(),
+          stats.medianFitness(),
+          stats.minFitness());
     }
   }
 

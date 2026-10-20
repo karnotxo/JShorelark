@@ -6,6 +6,9 @@
  */
 package io.jshorelark.optimizer.analyze;
 
+import io.jshorelark.optimizer.OptimizationConfig;
+import io.jshorelark.optimizer.OptimizationLog;
+import io.jshorelark.optimizer.OptimizationStatistics;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -15,23 +18,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.TreeMap;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import io.jshorelark.optimizer.OptimizationConfig;
-import io.jshorelark.optimizer.OptimizationLog;
-import io.jshorelark.optimizer.OptimizationStatistics;
-
 import lombok.extern.slf4j.Slf4j;
-
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Averages the JSONL produced by {@code simulate} per configuration and prints it as CSV.
  *
- * <p>Mirrors Rust's {@code AnalyzeCmd}. Configurations are kept in a sorted map so two runs over the
- * same input produce byte-identical CSV.
+ * <p>Mirrors Rust's {@code AnalyzeCmd}. Configurations are kept in a sorted map so two runs over
+ * the same input produce byte-identical CSV.
  */
 @Slf4j
 @Command(name = "analyze", description = "Analyze simulation results")
@@ -122,46 +118,5 @@ public final class AnalyzeCommand implements Runnable {
       result = Float.compare(left.gaMutCoeff(), right.gaMutCoeff());
     }
     return result;
-  }
-}
-
-/** Sums the fitness values of every sample of one configuration. */
-final class FitnessAccumulator {
-
-  /** Number of samples folded in so far. */
-  private int samples;
-
-  /** Running sums, divided by {@link #samples} when averaging. */
-  private float minFitness;
-
-  private float maxFitness;
-  private float avgFitness;
-  private float medianFitness;
-
-  /**
-   * Folds one generation's statistics into the running sums.
-   *
-   * @param stats the statistics of one generation
-   */
-  void add(OptimizationStatistics stats) {
-    samples++;
-    minFitness += stats.minFitness();
-    maxFitness += stats.maxFitness();
-    avgFitness += stats.avgFitness();
-    medianFitness += stats.medianFitness();
-  }
-
-  /**
-   * Divides the running sums by the sample count.
-   *
-   * @return the averaged statistics, or all zeros when nothing was accumulated
-   */
-  OptimizationStatistics average() {
-    if (samples == 0) {
-      return new OptimizationStatistics(0.0f, 0.0f, 0.0f, 0.0f);
-    }
-    float count = samples;
-    return new OptimizationStatistics(
-        minFitness / count, maxFitness / count, avgFitness / count, medianFitness / count);
   }
 }

@@ -6,17 +6,15 @@
  */
 package io.jshorelark.optimizer;
 
+import io.jshorelark.simulation.Simulation;
 import java.util.Objects;
 import java.util.Random;
-
-import io.jshorelark.simulation.Simulation;
-import io.jshorelark.simulation.Statistics;
 
 /**
  * Adapter that runs a grid-search configuration for a fixed number of generations.
  *
- * <p>Rust's optimizer drives {@code Simulation::train} directly; this class exists only to expose it
- * in terms of the optimizer's persisted value types. All the rules — evolution, selection, food
+ * <p>Rust's optimizer drives {@code Simulation::train} directly; this class exists only to expose
+ * it in terms of the optimizer's persisted value types. All the rules — evolution, selection, food
  * respawn — stay in {@link Simulation}, so the headless search and the JavaFX view cannot drift
  * apart.
  */
@@ -43,7 +41,7 @@ public final class OptimizingSimulation {
    * @return the statistics of the generation that just ended
    */
   public OptimizationStatistics train(Random random) {
-    Statistics statistics = simulation.train(random);
+    var statistics = simulation.train(random).getGa();
     return OptimizationStatistics.from(statistics);
   }
 

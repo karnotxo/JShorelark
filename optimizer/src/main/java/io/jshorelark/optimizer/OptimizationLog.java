@@ -12,8 +12,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * One JSONL line of an optimization run: the configuration, where it sits in the run, and how the
  * generation performed.
  *
- * <p>Mirrors Rust's {@code OptLog}. Property names are part of the persisted format; {@code analyze}
- * reads files produced by either implementation.
+ * <p>Mirrors Rust's {@code OptLog}. Property names are part of the persisted format; {@code
+ * analyze} reads files produced by either implementation.
  *
  * @param config the grid point that was simulated
  * @param context the generation and iteration indices

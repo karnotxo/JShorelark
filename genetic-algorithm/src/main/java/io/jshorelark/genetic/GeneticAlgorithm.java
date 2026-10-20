@@ -2,19 +2,17 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.genetic;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
 
 import io.jshorelark.genetic.crossover.CrossoverMethod;
 import io.jshorelark.genetic.mutation.MutationMethod;
 import io.jshorelark.genetic.selection.SelectionMethod;
 import io.jshorelark.genetic.statistics.Statistics;
-
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -44,8 +42,8 @@ public class GeneticAlgorithm<I extends Individual> {
    * @param crossoverMethod crossover method
    * @param mutationMethod mutation method
    * @param factory factory for creating new individuals
+   * @param <I> individual type produced by the factory
    * @return new genetic algorithm
-   * @param <I> a I class
    */
   public static <I extends Individual> GeneticAlgorithm<I> create(
       SelectionMethod selectionMethod,

@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.jshorelark</groupId>
@@ -39,8 +37,9 @@
     <maven.compiler.release>21</maven.compiler.release>
 
     <!-- Runtime dependencies -->
-    <jackson.version>2.22.4</jackson.version>
-    <javafx.version>21.0.12</javafx.version>
+    <!-- Jackson 3: the BOM also manages the 2.x annotations artifact used by the domain records. -->
+    <jackson.version>3.2.1</jackson.version>
+    <javafx.version>21.0.13</javafx.version>
     <log4j.version>2.26.1</log4j.version>
     <picocli.version>4.7.7</picocli.version>
     <slf4j.version>2.0.20</slf4j.version>
@@ -59,6 +58,7 @@
     <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
     <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
     <maven-failsafe-plugin.version>3.6.0</maven-failsafe-plugin.version>
+    <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
     <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
     <maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
@@ -68,7 +68,8 @@
 
     <!-- Tool versions -->
     <checkstyle.version>14.3.0</checkstyle.version>
-    <google-java-format.version>1.37.0</google-java-format.version>
+    <!-- Pin 1.36.1: 1.37.0 fails with InvocationTargetException under Spotless 3.10.4. -->
+    <google-java-format.version>1.36.1</google-java-format.version>
     <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
 
     <!-- Quality gates: never lowered to get a green build. -->
@@ -115,7 +116,7 @@
 
       <!-- BOMs -->
       <dependency>
-        <groupId>com.fasterxml.jackson</groupId>
+        <groupId>tools.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson.version}</version>
         <type>pom</type>
@@ -150,15 +151,11 @@
         <scope>provided</scope>
       </dependency>
 
-      <!-- JSON: versions come from jackson-bom. -->
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-annotations</artifactId>
-      </dependency>
+      <!--
+        JSON: jackson-databind / jackson-annotations are NOT redeclared here on purpose. A managed
+        entry without an explicit version would shadow the imported jackson-bom and strip both
+        artifacts of their version; the BOM above is the single source of truth.
+      -->
 
       <!-- CLI -->
       <dependency>
@@ -301,13 +298,6 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-checkstyle-plugin</artifactId>
           <version>${maven-checkstyle-plugin.version}</version>
-          <dependencies>
-            <dependency>
-              <groupId>com.puppycrawl.tools</groupId>
-              <artifactId>checkstyle</artifactId>
-              <version>${checkstyle.version}</version>
-            </dependency>
-          </dependencies>
           <configuration>
             <configLocation>${checkstyle.config.location}</configLocation>
             <!--
@@ -320,6 +310,13 @@
             <violationSeverity>error</violationSeverity>
             <linkXRef>false</linkXRef>
           </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>com.puppycrawl.tools</groupId>
+              <artifactId>checkstyle</artifactId>
+              <version>${checkstyle.version}</version>
+            </dependency>
+          </dependencies>
         </plugin>
 
         <plugin>
@@ -350,6 +347,12 @@
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>${maven-jar-plugin.version}</version>
+        </plugin>
+
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
@@ -373,20 +376,19 @@
                 <reflowLongStrings>true</reflowLongStrings>
                 <formatJavadoc>true</formatJavadoc>
               </googleJavaFormat>
-              <removeUnusedImports/>
+              <removeUnusedImports />
               <!--
                 google-java-format also owns import ordering (static block first, then a single
                 lexicographic block). Adding a separate <importOrder> step would fight it and
                 Checkstyle's CustomImportOrder at the same time.
               -->
               <licenseHeader>
-                <content>/*
+                <content><![CDATA[/*
  * Copyright (c) $YEAR JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
  * See: https://codeberg.org/pwy/shorelark
- */
-</content>
+ */]]></content>
               </licenseHeader>
             </java>
             <pom>
@@ -447,10 +449,10 @@
         <executions>
           <execution>
             <id>spotless-check</id>
-            <phase>validate</phase>
             <goals>
               <goal>check</goal>
             </goals>
+            <phase>validate</phase>
           </execution>
         </executions>
       </plugin>
@@ -461,10 +463,10 @@
         <executions>
           <execution>
             <id>checkstyle-check</id>
-            <phase>validate</phase>
             <goals>
               <goal>check</goal>
             </goals>
+            <phase>validate</phase>
           </execution>
         </executions>
       </plugin>
@@ -475,10 +477,10 @@
         <executions>
           <execution>
             <id>spotbugs-check</id>
-            <phase>verify</phase>
             <goals>
               <goal>check</goal>
             </goals>
+            <phase>verify</phase>
           </execution>
         </executions>
       </plugin>
@@ -489,11 +491,11 @@
         <executions>
           <execution>
             <id>pmd-check</id>
-            <phase>verify</phase>
             <goals>
               <goal>check</goal>
               <goal>cpd-check</goal>
             </goals>
+            <phase>verify</phase>
           </execution>
         </executions>
       </plugin>
@@ -510,10 +512,10 @@
           </execution>
           <execution>
             <id>report</id>
-            <phase>verify</phase>
             <goals>
               <goal>report</goal>
             </goals>
+            <phase>verify</phase>
           </execution>
         </executions>
       </plugin>

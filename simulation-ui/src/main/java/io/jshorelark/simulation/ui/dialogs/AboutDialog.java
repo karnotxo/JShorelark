@@ -2,10 +2,11 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.ui.dialogs;
 
+import io.jshorelark.simulation.ui.controls.ControlBuilder;
 import java.util.Random;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
@@ -30,8 +31,6 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
-
-import io.jshorelark.simulation.ui.controls.ControlBuilder;
 
 /**
  * About dialog showing version information and credits.
@@ -124,13 +123,13 @@ public class AboutDialog {
     var dragDelta = new DragDelta();
     root.setOnMousePressed(
         e -> {
-          dragDelta.x = dialog.getX() - e.getScreenX();
-          dragDelta.y = dialog.getY() - e.getScreenY();
+          dragDelta.deltaX = dialog.getX() - e.getScreenX();
+          dragDelta.deltaY = dialog.getY() - e.getScreenY();
         });
     root.setOnMouseDragged(
         e -> {
-          dialog.setX(e.getScreenX() + dragDelta.x);
-          dialog.setY(e.getScreenY() + dragDelta.y);
+          dialog.setX(e.getScreenX() + dragDelta.deltaX);
+          dialog.setY(e.getScreenY() + dragDelta.deltaY);
         });
 
     // Create scene and inherit styles from main window
@@ -144,8 +143,8 @@ public class AboutDialog {
 
   /** Helper class for window dragging. */
   private static class DragDelta {
-    double x;
-    double y;
+    double deltaX;
+    double deltaY;
   }
 
   /** Creates a bird shape for animation. */

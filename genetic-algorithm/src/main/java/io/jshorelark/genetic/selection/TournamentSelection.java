@@ -2,15 +2,14 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.genetic.selection;
 
+import io.jshorelark.genetic.Individual;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-
-import io.jshorelark.genetic.Individual;
 
 /**
  * Implements tournament selection. Randomly selects a group of individuals and chooses the one with

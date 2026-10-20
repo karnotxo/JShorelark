@@ -6,14 +6,13 @@
  */
 package io.jshorelark.simulation.bird;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Random;
-
 import io.jshorelark.genetic.Chromosome;
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
 
 /**
  * A single simulated bird: position, heading, speed, eye and brain.
@@ -39,12 +38,7 @@ public final class Bird {
   private Vector2D previousPosition;
 
   private Bird(
-      Vector2D position,
-      float rotation,
-      float speed,
-      BirdEye eye,
-      BirdBrain brain,
-      Config config) {
+      Vector2D position, float rotation, float speed, BirdEye eye, BirdBrain brain, Config config) {
     this.position = Objects.requireNonNull(position, "position");
     this.previousPosition = position;
     this.rotation = rotation;
@@ -59,8 +53,8 @@ public final class Bird {
   /**
    * Creates a bird with a given brain at a given position.
    *
-   * <p>Spawn speed is {@code simSpeedMax} and the heading is straight up, matching Rust's
-   * {@code Animal::new} defaults for the parts it randomises separately.
+   * <p>Spawn speed is {@code simSpeedMax} and the heading is straight up, matching Rust's {@code
+   * Animal::new} defaults for the parts it randomises separately.
    *
    * @param brain the bird's brain
    * @param position the starting position
@@ -130,8 +124,8 @@ public final class Bird {
   /**
    * Refreshes the eye, asks the brain for controls and applies them.
    *
-   * <p>Mirrors Rust's {@code Animal::process_brain}: vision first, then the two control values, then
-   * the speed clamp and the rotation update.
+   * <p>Mirrors Rust's {@code Animal::process_brain}: vision first, then the two control values,
+   * then the speed clamp and the rotation update.
    *
    * @param foods the food items currently in the world
    */
@@ -245,8 +239,8 @@ public final class Bird {
   /**
    * Normalises an angle into {@code [0, 2π)}.
    *
-   * <p>Rust stores the heading as a {@code Rotation2}, which is periodic by construction. Java keeps
-   * a plain float, so the normalisation has to happen explicitly, here and nowhere else.
+   * <p>Rust stores the heading as a {@code Rotation2}, which is periodic by construction. Java
+   * keeps a plain float, so the normalisation has to happen explicitly, here and nowhere else.
    */
   private static float normalizeAngle(float angle) {
     float twoPi = (float) (2 * Math.PI);

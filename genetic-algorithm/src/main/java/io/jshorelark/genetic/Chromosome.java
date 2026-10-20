@@ -2,16 +2,15 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.genetic;
 
+import io.jshorelark.genetic.mutation.MutationMethod;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-
-import io.jshorelark.genetic.mutation.MutationMethod;
 
 /**
  * A chromosome containing genes.
@@ -146,7 +145,6 @@ public class Chromosome {
    * @return an array of {@link float} objects
    */
   public float[] toArray() {
-    float[] result = Arrays.copyOf(genes, genes.length);
-    return result;
+    return Arrays.copyOf(genes, genes.length);
   }
 }

@@ -177,9 +177,14 @@
     <module name="FallThrough"/>
     <module name="UpperEll"/>
     <module name="ModifierOrder"/>
+    <!--
+      PACKAGE_DEF is intentionally absent from the token list: Spotless appends the licence header
+      directly above `package` and normalises away any blank line in between, so requiring one
+      would make `spotless:apply` and `checkstyle:check` mutually unsatisfiable.
+    -->
     <module name="EmptyLineSeparator">
       <property name="tokens"
-               value="PACKAGE_DEF, IMPORT, STATIC_IMPORT, CLASS_DEF, INTERFACE_DEF, ENUM_DEF,
+               value="IMPORT, STATIC_IMPORT, CLASS_DEF, INTERFACE_DEF, ENUM_DEF,
                     STATIC_INIT, INSTANCE_INIT, METHOD_DEF, CTOR_DEF, VARIABLE_DEF, RECORD_DEF,
                     COMPACT_CTOR_DEF"/>
       <property name="allowNoEmptyLineBetweenFields" value="true"/>

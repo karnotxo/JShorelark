@@ -6,13 +6,12 @@
  */
 package io.jshorelark.simulation.bird;
 
-import java.util.Objects;
-import java.util.Random;
-
 import io.jshorelark.genetic.Chromosome;
 import io.jshorelark.neural.LayeredNetwork;
 import io.jshorelark.neural.NeuralNetwork;
 import io.jshorelark.simulation.Config;
+import java.util.Objects;
+import java.util.Random;
 
 /**
  * Turns vision into the two control values a bird uses: speed and rotation deltas.
@@ -78,8 +77,8 @@ public final class BirdBrain {
    * <p>Mirrors Rust's {@code Brain::propagate} exactly. Output 0 is the speed control and output 1
    * is the rotation control; each is clamped to {@code [0, 2]} and shifted by {@code -1} to obtain
    * {@code [-1, 1]}, then clamped once more by its acceleration limit. The two controls are
-   * independent: an earlier port added and subtracted them, which is not what the reference does and
-   * changes the meaning of the network's outputs.
+   * independent: an earlier port added and subtracted them, which is not what the reference does
+   * and changes the meaning of the network's outputs.
    *
    * @param vision one strength value per eye cell
    * @return a two-element array: {@code [speedDelta, rotationDelta]}

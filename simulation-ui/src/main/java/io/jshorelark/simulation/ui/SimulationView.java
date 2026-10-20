@@ -2,20 +2,18 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.ui;
-
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.layout.Pane;
-import javafx.scene.paint.Color;
 
 import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
 import io.jshorelark.simulation.ui.evolution.EvolutionManager;
-
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -274,23 +272,17 @@ public class SimulationView extends Pane {
 
   /** Draws a bird. */
   private void drawBird(GraphicsContext gc, Bird bird) {
-    Vector2D screenPos = worldToScreen(bird.getPosition());
-    double rotation = bird.getRotation();
-    double screenSize = getScreenBirdSize();
-
-    // Draw trail
+    // Trail and sensors are drawn in world coordinates, before the local transform is applied.
     drawBirdTrail(gc, bird);
-
-    // Draw eye sensors
     drawEyeSensors(gc, bird);
 
-    // Save current transform
+    Vector2D screenPos = worldToScreen(bird.getPosition());
     gc.save();
-
-    // Translate and rotate
     gc.translate(screenPos.x(), screenPos.y());
     // Convert from model space (0° up, CCW) to screen space (0° right, CW)
-    gc.rotate(Math.toDegrees(rotation) - 90);
+    gc.rotate(Math.toDegrees(bird.getRotation()) - 90);
+
+    double screenSize = getScreenBirdSize();
 
     // Draw bird body
     gc.setFill(darkTheme ? DarkTheme.BIRD_COLOR : LightTheme.BIRD_COLOR);
@@ -329,19 +321,19 @@ public class SimulationView extends Pane {
     gc.fillOval(0, -screenEyeRadius, screenEyeRadius * 2, screenEyeRadius * 2);
 
     // Draw field of view lines
-    drawFieldOfView(gc, bird);
+    drawFieldOfView(gc);
 
     // Restore transform
     gc.restore();
   }
 
   /** Draws the bird's field of view lines. */
-  private void drawFieldOfView(GraphicsContext gc, Bird bird) {
-    double fovStart = -state.getEyeFovAngle() / 2;
-    double cellAngle = state.getEyeFovAngle() / state.getEyeCells();
+  private void drawFieldOfView(GraphicsContext gc) {
+    final double fovStart = -state.getEyeFovAngle() / 2;
+    final double cellAngle = state.getEyeFovAngle() / state.getEyeCells();
 
     // Scale FOV range to screen coordinates
-    double screenRange = getScreenFovRange();
+    final double screenRange = getScreenFovRange();
 
     gc.setStroke(darkTheme ? DarkTheme.EYE_COLOR : LightTheme.EYE_COLOR);
     gc.setLineWidth(1);
@@ -370,35 +362,26 @@ public class SimulationView extends Pane {
    * @param bird bird to draw sensors for
    */
   private void drawEyeSensors(GraphicsContext gc, Bird bird) {
-    Vector2D screenPos = worldToScreen(bird.getPosition());
-    float rotation = bird.getRotation();
-    float[] eyeInputs = bird.getVision();
-
-    // Scale FOV range to screen coordinates
-    double screenRange = getScreenFovRange();
-
-    double fovStart = rotation - state.getEyeFovAngle() / 2;
-    double cellAngle = state.getEyeFovAngle() / state.getEyeCells();
+    final Vector2D screenPos = worldToScreen(bird.getPosition());
+    final float[] eyeInputs = bird.getVision();
+    final double screenRange = getScreenFovRange();
+    final double fovStart = bird.getRotation() - state.getEyeFovAngle() / 2;
+    final double cellAngle = state.getEyeFovAngle() / state.getEyeCells();
 
     for (int i = 0; i < state.getEyeCells(); i++) {
       double startAngle = fovStart + cellAngle * i;
       double endAngle = startAngle + cellAngle;
       float input = eyeInputs[i];
 
-      // Choose color based on what the eye cell detects
-      Color sensorColor;
-      if (input == 0) {
+      // Positive strength means food, negative means a wall, zero means nothing in range. Alpha
+      // tracks the strength, so a far item is drawn fainter than a near one.
+      final Color sensorColor;
+      if (input == 0.0f) {
         sensorColor = darkTheme ? DarkTheme.SENSOR_EMPTY_COLOR : LightTheme.SENSOR_EMPTY_COLOR;
-      } else if (input > 0) {
-        // Food detected - green with alpha based on distance
-        // Clamp alpha to [0.0, 1.0]
-        double alpha = Math.min(Math.max(input, 0.0), 1.0);
-        sensorColor = Color.rgb(0, 255, 0, alpha);
+      } else if (input > 0.0f) {
+        sensorColor = Color.rgb(0, 255, 0, Math.clamp(input, 0.0f, 1.0f));
       } else {
-        // Wall detected - red with alpha based on distance
-        // Clamp alpha to [0.0, 1.0]
-        double alpha = Math.min(Math.max(-input, 0.0), 1.0);
-        sensorColor = Color.rgb(255, 0, 0, alpha);
+        sensorColor = Color.rgb(255, 0, 0, Math.clamp(-input, 0.0f, 1.0f));
       }
 
       // Draw sensor arc

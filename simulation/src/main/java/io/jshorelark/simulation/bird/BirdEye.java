@@ -6,20 +6,19 @@
  */
 package io.jshorelark.simulation.bird;
 
-import java.util.List;
-import java.util.Objects;
-
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * The bird's segmented field of view.
  *
  * <p>Mirrors Rust's {@code Eye}: the field of view is split into {@code eyeCells} equal bins; each
- * visible food item adds {@code (fovRange - distance) / fovRange} to exactly one bin, so nearer food
- * produces a stronger signal. The strength is a pure function of geometry and is what the brain
- * consumes as input.
+ * visible food item adds {@code (fovRange - distance) / fovRange} to exactly one bin, so nearer
+ * food produces a stronger signal. The strength is a pure function of geometry and is what the
+ * brain consumes as input.
  */
 public final class BirdEye {
 
@@ -31,7 +30,8 @@ public final class BirdEye {
    * Creates an eye configured from the simulation configuration.
    *
    * @param config the simulation configuration
-   * @throws IllegalArgumentException if the field of view range, angle or cell count is not positive
+   * @throws IllegalArgumentException if the field of view range, angle or cell count is not
+   *     positive
    */
   public BirdEye(Config config) {
     Objects.requireNonNull(config, "config");

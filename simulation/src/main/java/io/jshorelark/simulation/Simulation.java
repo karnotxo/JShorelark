@@ -6,10 +6,6 @@
  */
 package io.jshorelark.simulation;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Random;
-
 import io.jshorelark.genetic.GeneticAlgorithm;
 import io.jshorelark.genetic.crossover.UniformCrossover;
 import io.jshorelark.genetic.mutation.GaussianMutation;
@@ -20,6 +16,9 @@ import io.jshorelark.simulation.events.CollisionEvent;
 import io.jshorelark.simulation.events.CollisionListener;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.World;
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
 
 /**
  * One simulation run: a world plus the step clock that drives it.
@@ -124,7 +123,8 @@ public final class Simulation {
    * movements, then the generation check.
    *
    * @param random the random source used to respawn consumed food
-   * @return the statistics of the generation that just ended, or {@code null} if it is still running
+   * @return the statistics of the generation that just ended, or {@code null} if it is still
+   *     running
    */
   public Statistics step(Random random) {
     processCollisions(random);
@@ -189,8 +189,9 @@ public final class Simulation {
    * Feeds every bird that is close enough to a food item.
    *
    * <p>Mirrors Rust's {@code process_collisions}: the radius is {@link Config#foodSize()} and
-   * nothing else, a consumed item is repositioned rather than removed, and the loop is bird-major so
-   * several birds may eat the same item in the same step.
+   * nothing else, and a consumed item is repositioned in place rather than removed, so the food
+   * count stays constant. Because the loop is bird-major, a bird can be credited for several items
+   * in one step.
    */
   private void processCollisions(Random random) {
     float foodSize = config.foodSize();
@@ -209,7 +210,7 @@ public final class Simulation {
   /** Runs every bird's brain, which refreshes its vision and its controls. */
   private void processBrains() {
     for (Bird bird : world.getBirds()) {
-      bird.processBrain(world.getFoods(), config);
+      bird.processBrain(world.getFoods());
     }
   }
 
@@ -223,8 +224,8 @@ public final class Simulation {
   /**
    * Counts the step and evolves the population when the generation length is reached.
    *
-   * <p>Mirrors Rust's {@code try_evolving}, which increments the age first and evolves on
-   * {@code age > sim_generation_length}.
+   * <p>Mirrors Rust's {@code try_evolving}, which increments the age first and evolves on {@code
+   * age > sim_generation_length}.
    */
   private Statistics tryEvolving(Random random) {
     age++;
@@ -239,8 +240,8 @@ public final class Simulation {
    *
    * <p>Mirrors Rust's {@code evolve}: reset the clock, build one individual per bird, optionally
    * reverse the fitness, evolve, rebuild the population from the new chromosomes and reposition
-   * every food item. The reported statistics belong to the generation that just ended, hence
-   * {@code generation - 1}.
+   * every food item. The reported statistics belong to the generation that just ended, hence {@code
+   * generation - 1}.
    */
   private Statistics evolve(Random random) {
     age = 0;

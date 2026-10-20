@@ -7,15 +7,14 @@
 package io.jshorelark.optimizer;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import io.jshorelark.simulation.Config;
 
 /**
  * One grid-search configuration, as persisted in the optimizer's JSONL log.
  *
- * <p>Mirrors Rust's {@code OptConfig}: only the six parameters the search varies are stored. The JSON
- * property names are single letters and are a persisted contract, so they are annotated explicitly
- * rather than derived from the component names.
+ * <p>Mirrors Rust's {@code OptConfig}: only the six parameters the search varies are stored. The
+ * JSON property names are single letters and are a persisted contract, so they are annotated
+ * explicitly rather than derived from the component names.
  *
  * @param brainNeurons number of hidden neurons in each bird's brain
  * @param eyeFovRange maximum vision distance, in world units

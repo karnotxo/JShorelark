@@ -6,9 +6,8 @@
  */
 package io.jshorelark.simulation.ui.evolution;
 
-import java.util.Objects;
-
 import io.jshorelark.simulation.Statistics;
+import java.util.Objects;
 
 /**
  * A completed generation as the UI needs it: the generation number plus the fitness summary.

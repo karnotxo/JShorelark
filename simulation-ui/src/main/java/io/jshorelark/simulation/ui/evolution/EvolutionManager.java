@@ -6,25 +6,24 @@
  */
 package io.jshorelark.simulation.ui.evolution;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Random;
-import java.util.function.Consumer;
-
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.Simulation;
 import io.jshorelark.simulation.Statistics;
 import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.events.CollisionEvent;
 import io.jshorelark.simulation.food.Food;
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
+import java.util.function.Consumer;
 
 /**
  * Adapts the pure {@link Simulation} to the needs of the JavaFX view.
  *
- * <p>The generation clock lives in the domain: this class only steps the simulation and converts the
- * domain {@link Statistics} into the UI value type. It used to derive "generation finished" from a
- * bird's satiation, which made the UI disagree with the reference implementation; that rule now has
- * exactly one owner, {@code Simulation#step}.
+ * <p>The generation clock lives in the domain: this class only steps the simulation and converts
+ * the domain {@link Statistics} into the UI value type. It used to derive "generation finished"
+ * from a bird's satiation, which made the UI disagree with the reference implementation; that rule
+ * now has exactly one owner, {@code Simulation#step}.
  */
 public final class EvolutionManager {
 
@@ -73,7 +72,8 @@ public final class EvolutionManager {
    * Advances the simulation by one step.
    *
    * @param random the random source used to respawn consumed food
-   * @return the statistics of the generation that just ended, or {@code null} if it is still running
+   * @return the statistics of the generation that just ended, or {@code null} if it is still
+   *     running
    */
   public EvolutionStatistics update(Random random) {
     Statistics completed = simulation.step(random);
@@ -122,7 +122,8 @@ public final class EvolutionManager {
    * @return the fraction of the generation clock already elapsed
    */
   public double getGenerationProgress() {
-    return Math.min((double) simulation.getAge() / simulation.getConfig().simGenerationLength(), 1.0);
+    return Math.min(
+        (double) simulation.getAge() / simulation.getConfig().simGenerationLength(), 1.0);
   }
 
   /**

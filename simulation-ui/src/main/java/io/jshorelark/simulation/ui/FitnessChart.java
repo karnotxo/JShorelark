@@ -2,7 +2,7 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.ui;
 
@@ -77,16 +77,15 @@ public class FitnessChart extends LineChart<Number, Number> {
     medianSeries.getData().add(new XYChart.Data<>(generation, medianFitness));
     minSeries.getData().add(new XYChart.Data<>(generation, minFitness));
 
-    // Update x-axis range
-    NumberAxis xAxis = (NumberAxis) getXAxis();
-    if (generation > xAxis.getUpperBound()) {
-      xAxis.setUpperBound(generation + 10);
+    // Grow the horizontal axis only when a point would fall outside it.
+    NumberAxis horizontalAxis = (NumberAxis) getXAxis();
+    if (generation > horizontalAxis.getUpperBound()) {
+      horizontalAxis.setUpperBound(generation + 10);
     }
 
-    // Update y-axis range
-    NumberAxis yAxis = (NumberAxis) getYAxis();
-    if (maxFitness > yAxis.getUpperBound()) {
-      yAxis.setUpperBound(maxFitness * 1.1);
+    NumberAxis verticalAxis = (NumberAxis) getYAxis();
+    if (maxFitness > verticalAxis.getUpperBound()) {
+      verticalAxis.setUpperBound(maxFitness * 1.1);
     }
   }
 
@@ -98,9 +97,9 @@ public class FitnessChart extends LineChart<Number, Number> {
     minSeries.getData().clear();
 
     // Reset axes
-    NumberAxis xAxis = (NumberAxis) getXAxis();
-    xAxis.setUpperBound(100);
-    NumberAxis yAxis = (NumberAxis) getYAxis();
-    yAxis.setUpperBound(1);
+    NumberAxis horizontalAxis = (NumberAxis) getXAxis();
+    horizontalAxis.setUpperBound(100);
+    NumberAxis verticalAxis = (NumberAxis) getYAxis();
+    verticalAxis.setUpperBound(1);
   }
 }

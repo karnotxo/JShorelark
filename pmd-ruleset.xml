@@ -40,12 +40,9 @@
   <rule ref="category/java/errorprone.xml/MisplacedNullCheck"/>
   <rule ref="category/java/errorprone.xml/OverrideBothEqualsAndHashcode"/>
   <rule ref="category/java/errorprone.xml/ProperCloneImplementation"/>
-  <rule ref="category/java/errorprone.xml/ReturnEmptyArrayRatherThanNull"/>
   <rule ref="category/java/errorprone.xml/ReturnFromFinallyBlock"/>
-  <rule ref="category/java/errorprone.xml/UnconditionalDebugLog"/>
   <rule ref="category/java/errorprone.xml/UnnecessaryConversionTemporary"/>
   <rule ref="category/java/errorprone.xml/UnusedNullCheckInEquals"/>
-  <rule ref="category/java/errorprone.xml/UselessOperationOnImmutable"/>
 
   <rule ref="category/java/multithreading.xml/AvoidThreadGroup"/>
   <rule ref="category/java/multithreading.xml/DoNotUseThreads">

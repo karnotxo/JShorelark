@@ -6,13 +6,12 @@
  */
 package io.jshorelark.simulation.bird;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Random;
-
 import io.jshorelark.genetic.Chromosome;
 import io.jshorelark.genetic.Individual;
 import io.jshorelark.simulation.Config;
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
 
 /**
  * A bird seen as a genetic-algorithm individual: its chromosome plus the fitness it earned.
@@ -104,8 +103,8 @@ public final class BirdIndividual implements Individual {
   /**
    * Builds the bird that carries this individual's chromosome.
    *
-   * <p>The returned bird starts at a fresh random position and rotation, as in Rust's
-   * {@code AnimalIndividual::into_animal}.
+   * <p>The returned bird starts at a fresh random position and rotation, as in Rust's {@code
+   * AnimalIndividual::into_animal}.
    *
    * @param random the random source for the new bird's placement
    * @return a new bird with this chromosome

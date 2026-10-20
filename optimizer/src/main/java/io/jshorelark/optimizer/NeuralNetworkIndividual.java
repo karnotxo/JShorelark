@@ -2,14 +2,13 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.optimizer;
 
 import io.jshorelark.genetic.Chromosome;
 import io.jshorelark.genetic.Individual;
 import io.jshorelark.neural.LayeredNetwork;
-
 import lombok.Getter;
 
 /**

@@ -2,13 +2,12 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.genetic.crossover;
 
-import java.util.Random;
-
 import io.jshorelark.genetic.Chromosome;
+import java.util.Random;
 
 /**
  * Implements single-point crossover.

@@ -6,11 +6,9 @@
  */
 package io.jshorelark.optimizer;
 
-import java.util.Objects;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import io.jshorelark.genetic.statistics.Statistics;
+import java.util.Objects;
 
 /**
  * Fitness summary of one generation, as persisted in the optimizer's JSONL log.

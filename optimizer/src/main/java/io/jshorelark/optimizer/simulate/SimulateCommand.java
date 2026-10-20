@@ -6,6 +6,11 @@
  */
 package io.jshorelark.optimizer.simulate;
 
+import io.jshorelark.optimizer.OptimizationConfig;
+import io.jshorelark.optimizer.OptimizationContext;
+import io.jshorelark.optimizer.OptimizationLog;
+import io.jshorelark.optimizer.OptimizationStatistics;
+import io.jshorelark.optimizer.OptimizingSimulation;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -22,26 +27,17 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import io.jshorelark.optimizer.OptimizationConfig;
-import io.jshorelark.optimizer.OptimizationContext;
-import io.jshorelark.optimizer.OptimizationLog;
-import io.jshorelark.optimizer.OptimizationStatistics;
-import io.jshorelark.optimizer.OptimizingSimulation;
-
 import lombok.extern.slf4j.Slf4j;
-
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Grid-searches simulation parameters and writes one JSONL line per generation.
  *
  * <p>Mirrors Rust's {@code SimulateCmd}: the same parameter grid, the same iteration and generation
- * counts, the grid shuffled before it is spread over the available cores, and a single writer thread
- * so the simulations never block on disk.
+ * counts, the grid shuffled before it is spread over the available cores, and a single writer
+ * thread so the simulations never block on disk.
  */
 @Slf4j
 @Command(name = "simulate", description = "Run simulations")
@@ -84,7 +80,7 @@ public final class SimulateCommand implements Runnable {
   /** {@inheritDoc} */
   @Override
   public void run() {
-    Instant startedAt = Instant.now();
+    final Instant startedAt = Instant.now();
     List<ConfigurationIteration> configurations = generateConfigurations();
     if (testMode) {
       configurations = configurations.subList(0, Math.min(TEST_ITERATIONS, configurations.size()));
@@ -125,7 +121,9 @@ public final class SimulateCommand implements Runnable {
    * @param queue the hand-off queue to the writer thread
    */
   private void simulate(
-      ConfigurationIteration configuration, int generations, LinkedBlockingQueue<OptimizationLog> queue) {
+      ConfigurationIteration configuration,
+      int generations,
+      LinkedBlockingQueue<OptimizationLog> queue) {
     Random random = ThreadLocalRandom.current();
     var simulation = new OptimizingSimulation(configuration.config(), random);
     for (int generation = 0; generation < generations; generation++) {
@@ -182,8 +180,7 @@ public final class SimulateCommand implements Runnable {
    * @param totalGenerations how many generations the run will produce
    * @return the running monitor thread
    */
-  private Thread startProgressMonitor(
-      Instant startedAt, AtomicBoolean done, int totalGenerations) {
+  private Thread startProgressMonitor(Instant startedAt, AtomicBoolean done, int totalGenerations) {
     var monitor =
         new Thread(
             () -> {

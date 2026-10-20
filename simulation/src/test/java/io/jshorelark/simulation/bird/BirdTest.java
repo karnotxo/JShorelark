@@ -2,37 +2,40 @@
  * Copyright (c) 2025 JShorelark Contributors
  *
  * Licensed under the same terms as the original Shorelark project.
- * See: https://github.com/patryk27/shorelark
+ * See: https://codeberg.org/pwy/shorelark
  */
 package io.jshorelark.simulation.bird;
 
-import java.util.List;
-import java.util.Random;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.jshorelark.genetic.Chromosome;
 import io.jshorelark.neural.LayeredNetwork;
 import io.jshorelark.simulation.Config;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
+import java.util.List;
+import java.util.Random;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-/** Tests for the Bird class. */
+@DisplayName("Bird")
 class BirdTest {
+
   private Config config;
   private Random random;
-  private LayeredNetwork network;
 
   @BeforeEach
   void setUp() {
+    // Derived from the reference defaults so every field stays valid; only the values this test
+    // asserts on are overridden.
     config =
-        Config.builder()
+        Config.defaults().toBuilder()
             .eyeCells(3)
             .brainNeurons(2)
             .simSpeedMax(1.0f)
@@ -40,110 +43,93 @@ class BirdTest {
             .simSpeedAccel(0.5f)
             .simRotationAccel(0.3f)
             .build();
-
-    random = new Random(42); // Fixed seed for reproducible tests
-    network = mock(LayeredNetwork.class);
+    // Fixed seed so every run of the suite sees the same weights.
+    random = new Random(42);
   }
 
   @Test
-  void testRandomBirdBrain() {
-    // Given
-    int[] expectedTopology = {config.eyeCells(), config.brainNeurons(), 2};
-    when(network.matchesTopology(expectedTopology)).thenReturn(true);
+  @DisplayName("builds a random brain that matches the configured topology")
+  void randomBrain() {
+    final BirdBrain brain = BirdBrain.random(random, config);
 
-    // When
-    BirdBrain brain = BirdBrain.random(random, config);
-
-    // Then
-    assertThat(brain).isNotNull();
+    assertThat(brain.getNetwork().matchesTopology(config.brainTopology())).isTrue();
   }
 
   @Test
-  void testBirdBrainFromChromosome() {
-    // Given
-    // For topology [3, 2, 2], we need:
-    // Layer 1: 3 inputs -> 2 neurons = (3+1)*2 = 8 weights (including biases)
-    // Layer 2: 2 inputs -> 2 neurons = (2+1)*2 = 6 weights (including biases)
-    // Total: 14 weights
-    float[] genes = {
-      // Layer 1 (3 inputs -> 2 neurons)
-      0.1f,
-      0.2f,
-      0.3f,
-      0.4f, // First neuron (bias + 3 weights)
-      0.5f,
-      0.6f,
-      0.7f,
-      0.8f, // Second neuron (bias + 3 weights)
-      // Layer 2 (2 inputs -> 2 neurons)
-      0.9f,
-      1.0f,
-      1.1f, // First neuron (bias + 2 weights)
-      1.2f,
-      1.3f,
-      1.4f // Second neuron (bias + 2 weights)
+  @DisplayName("round-trips a chromosome through a brain")
+  void brainFromChromosome() {
+    // Topology [3, 2, 2]: layer 1 is (3 + 1) * 2 = 8 weights, layer 2 is (2 + 1) * 2 = 6.
+    final float[] genes = {
+      0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f
     };
-    Chromosome chromosome = Chromosome.of(genes);
-    int[] expectedTopology = {config.eyeCells(), config.brainNeurons(), 2};
-    when(network.matchesTopology(expectedTopology)).thenReturn(true);
 
-    // When
-    BirdBrain brain = BirdBrain.fromChromosome(chromosome, config);
+    final BirdBrain brain = BirdBrain.fromChromosome(Chromosome.of(genes), config);
 
-    // Then
-    assertThat(brain).isNotNull();
     assertThat(brain.toChromosome().getGenes()).containsExactly(genes);
   }
 
   @Test
-  void testProcessInputs() {
-    // Given
-    float[] vision = {0.5f, -0.6f, 0.7f};
-    float[] networkOutput = {0.8f, 0.3f}; // Will be clamped and shifted
-    int[] topology = {config.eyeCells(), config.brainNeurons(), 2};
-    when(network.matchesTopology(topology)).thenReturn(true);
-    when(network.propagate(vision)).thenReturn(networkOutput);
-    BirdBrain brain = BirdBrain.fromNetwork(network, config, topology);
+  @DisplayName("maps raw outputs to independent speed and rotation deltas")
+  void processInputsClampsBothControls() {
+    final float[] vision = {0.5f, -0.6f, 0.7f};
+    final LayeredNetwork network = mock(LayeredNetwork.class);
+    when(network.matchesTopology(any(int[].class))).thenReturn(true);
+    when(network.propagate(vision)).thenReturn(new float[] {0.8f, 0.3f});
 
-    // When
-    float[] result = brain.processInputs(vision);
+    final float[] result = BirdBrain.fromNetwork(network, config).processInputs(vision);
 
-    // Then
-    // r0 = 0.8 - 0.5 = 0.3
-    // r1 = 0.3 - 0.5 = -0.2
-    // speed = clamp(0.3 + (-0.2), -0.5, 0.5) = 0.1
-    // rotation = clamp(0.3 - (-0.2), -0.3, 0.3) = clamp(0.5, -0.3, 0.3) = 0.3
-    assertThat(result[0]).isCloseTo(0.1f, within(0.001f));
-    assertThat(result[1]).isCloseTo(0.3f, within(0.001f));
+    // Rust: clamp(0.8, 0, 2) - 1 = -0.2, then clamp by speedAccel 0.5 -> -0.2.
+    //       clamp(0.3, 0, 2) - 1 = -0.7, then clamp by rotationAccel 0.3 -> -0.3.
+    assertThat(result[0]).isCloseTo(-0.2f, within(1e-6f));
+    assertThat(result[1]).isCloseTo(-0.3f, within(1e-6f));
   }
 
   @Test
-  void testBirdMovement() {
-    // Given
-    BirdBrain brain = BirdBrain.random(random, config);
-    Vector2D position = new Vector2D(0.5f, 0.5f);
-    Bird bird = Bird.create(brain, position, config);
+  @DisplayName("rejects a network whose topology does not match the configuration")
+  void fromNetworkRejectsWrongTopology() {
+    final LayeredNetwork network = mock(LayeredNetwork.class);
+    when(network.matchesTopology(any(int[].class))).thenReturn(false);
 
-    // When
-    bird.processBrain(List.<Food>of(), config);
+    assertThatThrownBy(() -> BirdBrain.fromNetwork(network, config))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("topology");
+  }
+
+  @Test
+  @DisplayName("moves along its heading after thinking")
+  void movementChangesPosition() {
+    final BirdBrain brain = BirdBrain.random(random, config);
+    final Vector2D position = new Vector2D(0.5f, 0.5f);
+    final Bird bird = Bird.create(brain, position, config);
+
+    bird.processBrain(List.<Food>of());
     bird.processMovement();
 
-    // Then
     assertThat(bird.getPosition()).isNotEqualTo(position);
+    assertThat(bird.getPreviousPosition()).isEqualTo(position);
   }
 
   @Test
-  void testBirdVision() {
-    // Given
-    BirdBrain brain = BirdBrain.random(random, config);
-    Vector2D position = new Vector2D(0.5f, 0.5f);
-    Bird bird = Bird.create(brain, position, config);
-    List<Food> foods = List.<Food>of(Food.at(new Vector2D(0.7f, 0.7f)));
+  @DisplayName("refreshes its vision with one value per eye cell")
+  void visionHasOneValuePerCell() {
+    final BirdBrain brain = BirdBrain.random(random, config);
+    final Bird bird = Bird.create(brain, new Vector2D(0.5f, 0.5f), config);
+    final List<Food> foods = List.of(Food.at(new Vector2D(0.7f, 0.7f)));
 
-    // When
-    bird.processBrain(foods, config);
+    bird.processBrain(foods);
 
-    // Then
     assertThat(bird.getVision()).hasSize(config.eyeCells());
+  }
+
+  @Test
+  @DisplayName("eating increases satiation, which is also the fitness")
+  void eatingIncreasesSatiation() {
+    final Bird bird =
+        Bird.create(BirdBrain.random(random, config), new Vector2D(0.5f, 0.5f), config);
+
+    bird.eat();
+    bird.eat();
+
+    assertThat(bird.getSatiation()).isEqualTo(2.0f);
   }
 }

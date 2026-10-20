@@ -6,15 +6,14 @@
  */
 package io.jshorelark.simulation.physics;
 
+import io.jshorelark.simulation.Config;
+import io.jshorelark.simulation.bird.Bird;
+import io.jshorelark.simulation.food.Food;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
-
-import io.jshorelark.simulation.Config;
-import io.jshorelark.simulation.bird.Bird;
-import io.jshorelark.simulation.food.Food;
 
 /**
  * The container that holds everything that exists in a simulation: birds and food.

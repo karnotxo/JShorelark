@@ -6,21 +6,18 @@
  */
 package io.jshorelark.optimizer.simulate;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.jshorelark.optimizer.OptimizationLog;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import io.jshorelark.optimizer.OptimizationLog;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("SimulateCommand")
 class SimulateCommandTest {

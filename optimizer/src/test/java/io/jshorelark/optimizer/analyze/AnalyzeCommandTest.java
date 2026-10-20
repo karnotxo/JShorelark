@@ -6,25 +6,22 @@
  */
 package io.jshorelark.optimizer.analyze;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.jshorelark.optimizer.OptimizationConfig;
+import io.jshorelark.optimizer.OptimizationContext;
+import io.jshorelark.optimizer.OptimizationLog;
+import io.jshorelark.optimizer.OptimizationStatistics;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import io.jshorelark.optimizer.OptimizationConfig;
-import io.jshorelark.optimizer.OptimizationContext;
-import io.jshorelark.optimizer.OptimizationLog;
-import io.jshorelark.optimizer.OptimizationStatistics;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("AnalyzeCommand")
 class AnalyzeCommandTest {
@@ -73,9 +70,7 @@ class AnalyzeCommandTest {
   private static OptimizationLog log(
       OptimizationConfig config, float min, float max, float avg, float median) {
     return new OptimizationLog(
-        config,
-        new OptimizationContext(0, 0),
-        new OptimizationStatistics(min, max, avg, median));
+        config, new OptimizationContext(0, 0), new OptimizationStatistics(min, max, avg, median));
   }
 
   private String runAndCapture(Path input) {
