@@ -13,10 +13,17 @@ import javafx.scene.chart.XYChart;
 /**
  * Chart that displays fitness statistics over time.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>The axes are created here and kept in fields instead of being read back from {@code
+ * getXAxis()}/{@code getYAxis()}: touching overridable accessors inside a constructor is unsafe for
+ * subclasses, so the chart owns the two axes it builds.
  */
-public class FitnessChart extends LineChart<Number, Number> {
+public final class FitnessChart extends LineChart<Number, Number> {
+
+  private static final int INITIAL_GENERATIONS = 100;
+  private static final double INITIAL_FITNESS = 1.0;
+
+  private final NumberAxis horizontalAxis;
+  private final NumberAxis verticalAxis;
 
   /** The series for maximum fitness. */
   private final XYChart.Series<Number, Number> maxSeries;
@@ -32,43 +39,40 @@ public class FitnessChart extends LineChart<Number, Number> {
 
   /** Creates a new fitness chart. */
   public FitnessChart() {
-    super(new NumberAxis("Generation", 0, 100, 10), new NumberAxis("Fitness", 0, 1, 0.1));
+    super(
+        new NumberAxis("Generation", 0, INITIAL_GENERATIONS, 10),
+        new NumberAxis("Fitness", 0, INITIAL_FITNESS, 0.1));
 
-    // Configure axes
-    getXAxis().setAnimated(false);
-    getYAxis().setAnimated(false);
+    horizontalAxis = (NumberAxis) getXAxis();
+    verticalAxis = (NumberAxis) getYAxis();
+    horizontalAxis.setAnimated(false);
+    verticalAxis.setAnimated(false);
     setAnimated(false);
 
-    // Create series
-    maxSeries = new XYChart.Series<>();
-    maxSeries.setName("Max");
-    getData().add(maxSeries);
+    maxSeries = namedSeries("Max");
+    avgSeries = namedSeries("Avg");
+    medianSeries = namedSeries("Median");
+    minSeries = namedSeries("Min");
 
-    avgSeries = new XYChart.Series<>();
-    avgSeries.setName("Avg");
-    getData().add(avgSeries);
-
-    medianSeries = new XYChart.Series<>();
-    medianSeries.setName("Median");
-    getData().add(medianSeries);
-
-    minSeries = new XYChart.Series<>();
-    minSeries.setName("Min");
-    getData().add(minSeries);
-
-    // Configure chart
     setCreateSymbols(false);
     setLegendVisible(true);
   }
 
+  private XYChart.Series<Number, Number> namedSeries(String name) {
+    var series = new XYChart.Series<Number, Number>();
+    series.setName(name);
+    getData().add(series);
+    return series;
+  }
+
   /**
-   * Updates the chart with new statistics.
+   * Appends one generation to every series.
    *
-   * @param generation the current generation
-   * @param maxFitness the maximum fitness
-   * @param avgFitness the average fitness
+   * @param generation the generation number
+   * @param maxFitness the highest fitness in the generation
+   * @param avgFitness the mean fitness
    * @param medianFitness the median fitness
-   * @param minFitness the minimum fitness
+   * @param minFitness the lowest fitness
    */
   public void update(
       int generation, float maxFitness, float avgFitness, float medianFitness, float minFitness) {
@@ -78,28 +82,22 @@ public class FitnessChart extends LineChart<Number, Number> {
     minSeries.getData().add(new XYChart.Data<>(generation, minFitness));
 
     // Grow the horizontal axis only when a point would fall outside it.
-    NumberAxis horizontalAxis = (NumberAxis) getXAxis();
     if (generation > horizontalAxis.getUpperBound()) {
       horizontalAxis.setUpperBound(generation + 10);
     }
-
-    NumberAxis verticalAxis = (NumberAxis) getYAxis();
     if (maxFitness > verticalAxis.getUpperBound()) {
       verticalAxis.setUpperBound(maxFitness * 1.1);
     }
   }
 
-  /** Clears all data from the chart. */
+  /** Clears all data and restores the initial axis bounds. */
   public void clear() {
     maxSeries.getData().clear();
     avgSeries.getData().clear();
     medianSeries.getData().clear();
     minSeries.getData().clear();
 
-    // Reset axes
-    NumberAxis horizontalAxis = (NumberAxis) getXAxis();
-    horizontalAxis.setUpperBound(100);
-    NumberAxis verticalAxis = (NumberAxis) getYAxis();
-    verticalAxis.setUpperBound(1);
+    horizontalAxis.setUpperBound(INITIAL_GENERATIONS);
+    verticalAxis.setUpperBound(INITIAL_FITNESS);
   }
 }

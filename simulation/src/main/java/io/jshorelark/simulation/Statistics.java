@@ -6,64 +6,64 @@
  */
 package io.jshorelark.simulation;
 
-import lombok.Value;
+import java.util.Objects;
 
 /**
- * Statistics about the simulation. This class is equivalent to the Statistics struct in the Rust
- * implementation.
+ * Statistics of a generation that just finished.
  *
- * @author Jose
- * @version $Id: $Id
+ * <p>Mirrors Rust's {@code Statistics} struct. The four fitness aggregates are delegated to the
+ * genetic-algorithm statistics, so this type never recomputes them: exactly one calculator exists.
+ *
+ * @param generation the generation that produced these values
+ * @param ga the population statistics reported by the genetic algorithm
  */
-@Value
-public class Statistics {
-  /** Generation number. */
-  int generation;
+public record Statistics(int generation, io.jshorelark.genetic.statistics.Statistics ga) {
 
-  /** Genetic algorithm statistics. */
-  io.jshorelark.genetic.statistics.Statistics ga;
+  /** Validates the components. */
+  public Statistics {
+    Objects.requireNonNull(ga, "ga");
+  }
 
   /**
-   * Returns the min fitness.
+   * Returns the lowest fitness in the population.
    *
-   * @return a float
+   * @return the minimum fitness
    */
-  public float getMinFitness() {
+  public float minFitness() {
     return ga.getMinFitness();
   }
 
   /**
-   * Returns the max fitness.
+   * Returns the highest fitness in the population.
    *
-   * @return a float
+   * @return the maximum fitness
    */
-  public float getMaxFitness() {
+  public float maxFitness() {
     return ga.getMaxFitness();
   }
 
   /**
-   * Returns the average fitness.
+   * Returns the mean fitness of the population.
    *
-   * @return a float
+   * @return the average fitness
    */
-  public float getAvgFitness() {
+  public float avgFitness() {
     return ga.getAvgFitness();
   }
 
   /**
-   * Returns the median fitness.
+   * Returns the median fitness of the population.
    *
-   * @return a float
+   * @return the median fitness
    */
-  public float getMedianFitness() {
+  public float medianFitness() {
     return ga.getMedianFitness();
   }
 
   /** {@inheritDoc} */
   @Override
   public String toString() {
-    return String.format(
-        "Statistics{minFitness=%.2f, maxFitness=%.2f, avgFitness=%.2f, medianFitness=%.2f}%n",
-        ga.getMinFitness(), ga.getMaxFitness(), ga.getAvgFitness(), ga.getMedianFitness());
+    return "Statistics{minFitness=%.2f, maxFitness=%.2f, avgFitness=%.2f, medianFitness=%.2f}"
+        .formatted(minFitness(), maxFitness(), avgFitness(), medianFitness());
   }
 }

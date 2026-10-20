@@ -34,11 +34,11 @@ public record EvolutionStatistics(
   public static EvolutionStatistics from(Statistics statistics) {
     Objects.requireNonNull(statistics, "statistics");
     return new EvolutionStatistics(
-        statistics.getGeneration(),
-        statistics.getMinFitness(),
-        statistics.getMaxFitness(),
-        statistics.getAvgFitness(),
-        statistics.getMedianFitness());
+        statistics.generation(),
+        statistics.minFitness(),
+        statistics.maxFitness(),
+        statistics.avgFitness(),
+        statistics.medianFitness());
   }
 
   @Override

@@ -7,16 +7,11 @@
 package io.jshorelark.optimizer.simulate;
 
 import io.jshorelark.optimizer.OptimizationConfig;
-import lombok.AllArgsConstructor;
-import lombok.Value;
 
-/** A configuration and its iteration number. */
-@Value
-@AllArgsConstructor
-class ConfigurationIteration {
-  /** The configuration. */
-  OptimizationConfig config;
-
-  /** The iteration number. */
-  int iteration;
-}
+/**
+ * A grid point together with its repetition index.
+ *
+ * @param config the grid point
+ * @param iteration the repetition index, so repeated runs stay distinguishable in the log
+ */
+record ConfigurationIteration(OptimizationConfig config, int iteration) {}

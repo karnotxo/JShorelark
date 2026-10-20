@@ -41,7 +41,7 @@ public final class OptimizingSimulation {
    * @return the statistics of the generation that just ended
    */
   public OptimizationStatistics train(Random random) {
-    var statistics = simulation.train(random).getGa();
+    var statistics = simulation.train(random).ga();
     return OptimizationStatistics.from(statistics);
   }
 

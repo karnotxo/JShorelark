@@ -12,22 +12,21 @@ import io.jshorelark.simulation.ui.audio.SoundManager;
 import io.jshorelark.simulation.ui.dialogs.AboutDialog;
 import io.jshorelark.simulation.ui.evolution.EvolutionManager;
 import io.jshorelark.simulation.ui.icons.AppIcon;
+import java.util.Locale;
 import java.util.Random;
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.CheckMenuItem;
-import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
@@ -88,38 +87,13 @@ public class SimulationApplication extends Application {
     }
   }
 
-  /** Wrapper for Stage to prevent external modification. */
-  private static class StageWrapper {
-    private final Stage stage;
-
-    private StageWrapper(Stage stage) {
-      this.stage = stage;
-    }
-
-    public Stage getStage() {
-      return stage;
-    }
-
-    public void setTitle(String title) {
-      stage.setTitle(title);
-    }
-
-    public void setIcons(javafx.collections.ObservableList<javafx.scene.image.Image> icons) {
-      stage.getIcons().addAll(icons);
-    }
-
-    public void setScene(Scene scene) {
-      stage.setScene(scene);
-    }
-
-    public Scene getScene() {
-      return stage.getScene();
-    }
-
-    public void show() {
-      stage.show();
-    }
-  }
+  /**
+   * Wall-clock budget of one simulation frame at speed 1, i.e. roughly 60 steps per second.
+   *
+   * <p>Nanos rather than millis so the animation timer can compare against {@code
+   * AnimationTimer#handle}, which reports nanoseconds.
+   */
+  private static final long BASE_FRAME_NANOS = 16_666_667L;
 
   /** The evolution manager. */
   private EvolutionManager evolutionManager;
@@ -148,8 +122,12 @@ public class SimulationApplication extends Application {
   /** The current theme (dark/light). */
   private boolean darkTheme = true;
 
-  /** The primary stage. */
-  private StageWrapper primaryStage;
+  /**
+   * The scene once {@link #start(Stage)} has built it.
+   *
+   * <p>Held so theme toggling does not have to read it back from the stage wrapper.
+   */
+  private Scene scene;
 
   /** The sound manager. */
   private final SoundManager soundManager = new SoundManager();
@@ -248,42 +226,12 @@ public class SimulationApplication extends Application {
     return manager;
   }
 
-  /** Resets the simulation. */
+  /** Resets the simulation to the reference configuration. */
   public void resetSimulation() {
-    // Pause the simulation during reset
     boolean wasPaused = isPaused();
     setPaused(true);
 
-    Platform.runLater(
-        () -> {
-          try {
-            // Create new evolution manager
-            evolutionManager = createEvolutionManager(Config.defaults());
-
-            // Create new simulation view
-            var newSimulationView = new SimulationView(evolutionManager);
-            newSimulationView.setPrefSize(800, 600);
-
-            // Find the parent and replace the old view with the new one
-            VBox parent = (VBox) simulationView.getParent();
-            int index = parent.getChildren().indexOf(simulationView);
-            parent.getChildren().set(index, newSimulationView);
-
-            // Update the reference
-            simulationView = newSimulationView;
-
-            // Clear the chart
-            fitnessChart.clear();
-
-            // Restore previous pause state
-            setPaused(wasPaused);
-
-            println("Simulation reset");
-          } catch (Exception e) {
-            log.error("Failed to reset simulation", e);
-            println("Error: Failed to reset simulation - " + e.getMessage());
-          }
-        });
+    Platform.runLater(() -> resetSimulationWithConfig(Config.defaults(), wasPaused));
   }
 
   /**
@@ -299,22 +247,15 @@ public class SimulationApplication extends Application {
   /** {@inheritDoc} */
   @Override
   public void init() {
-    // Initialize evolution manager before UI
+    // Build the world before the scene exists. The splash screen already enforces its own minimum
+    // visible time, so blocking here would only delay startup.
     evolutionManager = createEvolutionManager(Config.defaults());
-
-    // Ensure splash screen shows for at least 3 seconds
-    try {
-      Thread.sleep(3000);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
   }
 
   /** {@inheritDoc} */
   @Override
   public void start(final Stage primaryStage) {
     log.info("Starting simulation UI");
-    this.primaryStage = new StageWrapper(primaryStage);
 
     // Create UI components
     createTerminal();
@@ -331,30 +272,34 @@ public class SimulationApplication extends Application {
     rightPanel.setPadding(new Insets(10));
     VBox.setVgrow(simulationView, Priority.ALWAYS);
 
-    HBox root = new HBox(10, leftPanel, rightPanel);
-    root.setPadding(new Insets(10));
+    HBox content = new HBox(10, leftPanel, rightPanel);
+    content.setPadding(new Insets(10));
     HBox.setHgrow(leftPanel, Priority.NEVER);
     HBox.setHgrow(rightPanel, Priority.ALWAYS);
 
-    // Create menu bar
-    MenuBar menuBar = createMenuBar();
-    VBox mainLayout = new VBox(menuBar, root);
-    VBox.setVgrow(root, Priority.ALWAYS);
-
-    // Create scene
-    Scene scene = new Scene(mainLayout);
-    scene.getStylesheets().add(getThemeStylesheet());
-    this.primaryStage.setTitle("JShorelark");
-    this.primaryStage.setIcons(AppIcon.createIcons());
-    this.primaryStage.setScene(scene);
-
-    // Print welcome message
+    this.scene = attachScene(primaryStage, content);
     printWelcome();
-
-    // Start animation loop
     startAnimationLoop();
+    primaryStage.show();
+  }
 
-    this.primaryStage.show();
+  /**
+   * Builds the window's scene graph and installs it on the stage.
+   *
+   * @param stage the primary stage
+   * @param content the simulation panel
+   * @return the scene, so the theme toggle can swap stylesheets
+   */
+  private Scene attachScene(Stage stage, Region content) {
+    var mainLayout = new VBox(createMenuBar(stage), content);
+    VBox.setVgrow(content, Priority.ALWAYS);
+
+    var scene = new Scene(mainLayout);
+    scene.getStylesheets().add(getThemeStylesheet());
+    stage.setTitle("JShorelark");
+    stage.getIcons().addAll(AppIcon.createIcons());
+    stage.setScene(scene);
+    return scene;
   }
 
   /** Creates the terminal components. */
@@ -380,6 +325,7 @@ public class SimulationApplication extends Application {
   private void createSimulationView() {
     simulationView = new SimulationView(evolutionManager);
     simulationView.setPrefSize(800, 600);
+    simulationView.initializeView();
   }
 
   /** Creates the fitness chart. */
@@ -395,48 +341,23 @@ public class SimulationApplication extends Application {
     return controls;
   }
 
-  /** Creates the menu bar. */
-  private MenuBar createMenuBar() {
-    Menu fileMenu = new Menu("File");
-    fileMenu
-        .getItems()
-        .addAll(
-            new MenuItem("Reset") {
-              {
-                setOnAction(e -> handleReset(new String[] {"r"}));
-              }
+  /**
+   * Creates the menu bar.
+   *
+   * @param owner the window that owns the About dialog
+   * @return the populated menu bar
+   */
+  private MenuBar createMenuBar(Stage owner) {
+    var actions =
+        new SimulationMenuBar.Actions(
+            () -> handleReset(new String[] {"r"}),
+            this::toggleTheme,
+            enabled -> {
+              soundEnabled = enabled;
+              soundManager.setEnabled(enabled);
             },
-            new SeparatorMenuItem(),
-            new MenuItem("Exit") {
-              {
-                setOnAction(e -> Platform.exit());
-              }
-            });
-
-    var themeMenuItem = new CheckMenuItem("Dark Theme");
-    themeMenuItem.setSelected(darkTheme);
-    themeMenuItem.setOnAction(e -> toggleTheme());
-
-    var soundMenuItem = new CheckMenuItem("Sound Effects");
-    soundMenuItem.setSelected(soundEnabled);
-    soundMenuItem.setOnAction(
-        e -> {
-          soundEnabled = soundMenuItem.isSelected();
-          soundManager.setEnabled(soundEnabled);
-        });
-
-    Menu viewMenu = new Menu("View", null, themeMenuItem, soundMenuItem);
-    Menu helpMenu = new Menu("Help");
-    helpMenu
-        .getItems()
-        .addAll(
-            new MenuItem("About") {
-              {
-                setOnAction(e -> AboutDialog.show(primaryStage.getStage()));
-              }
-            });
-
-    return new MenuBar(fileMenu, viewMenu, helpMenu);
+            () -> AboutDialog.show(owner));
+    return new SimulationMenuBar(owner, darkTheme, soundEnabled, actions);
   }
 
   /** Gets the current theme stylesheet. */
@@ -447,7 +368,6 @@ public class SimulationApplication extends Application {
   /** Toggles the theme. */
   private void toggleTheme() {
     darkTheme = !darkTheme;
-    Scene scene = primaryStage.getScene();
     if (scene != null) {
       scene.getStylesheets().clear();
       scene.getStylesheets().add(getThemeStylesheet());
@@ -458,23 +378,39 @@ public class SimulationApplication extends Application {
     }
   }
 
-  /** Starts the animation loop. */
+  /**
+   * Starts the animation loop.
+   *
+   * <p>An {@link AnimationTimer} ticks on the FX thread, so no work crosses threads and the scene
+   * graph is only ever touched where it is allowed to be. The timer accumulates the elapsed time
+   * and advances the simulation whenever the accumulated budget covers one frame at the current
+   * speed, which keeps the pace independent of the display refresh rate.
+   */
   private void startAnimationLoop() {
-    Thread animationThread =
-        new Thread(
-            () -> {
-              while (true) {
-                try {
-                  Thread.sleep((long) (16 / simulationSpeed)); // ~60 FPS adjusted for speed
-                  Platform.runLater(this::redraw);
-                } catch (InterruptedException e) {
-                  break;
-                }
-              }
-            },
-            "AnimationLoop");
-    animationThread.setDaemon(true);
-    animationThread.start();
+    var timer =
+        new AnimationTimer() {
+          private long lastTick;
+          private boolean primed;
+
+          @Override
+          public void handle(long now) {
+            // JavaFX reports nanoseconds since an arbitrary origin, so zero is a valid timestamp:
+            // a flag separates "not started yet" from a real tick instead of a sentinel value.
+            if (!primed) {
+              primed = true;
+              lastTick = now;
+              return;
+            }
+            long elapsedNanos = now - lastTick;
+            long budgetNanos = (long) (BASE_FRAME_NANOS / simulationSpeed);
+            if (elapsedNanos < budgetNanos) {
+              return;
+            }
+            lastTick = now;
+            redraw();
+          }
+        };
+    timer.start();
   }
 
   /** Redraws the simulation. */
@@ -504,7 +440,9 @@ public class SimulationApplication extends Application {
       return;
     }
 
-    String[] parts = command.trim().toLowerCase().split("\\s+");
+    // Locale.ROOT: the commands are ASCII keywords, and a Turkish locale would lowercase "I" to a
+    // dotless i, silently rejecting every uppercase command.
+    String[] parts = command.trim().toLowerCase(Locale.ROOT).split("\\s+");
     String cmd = parts[0];
 
     try {
@@ -528,60 +466,61 @@ public class SimulationApplication extends Application {
           println("Unknown command: " + cmd);
           break;
       }
-    } catch (Exception e) {
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      log.error("Command failed: {}", command, e);
       println("Error: " + e.getMessage());
     }
   }
 
   /** Handles the reset command. */
   private void handleReset(String[] args) {
-    // Pause the simulation during reset
+    // Parse before touching the world: a bad argument must not stop a running simulation.
+    Config config;
+    try {
+      config = parseResetArguments(args);
+    } catch (IllegalArgumentException e) {
+      println("Error: " + e.getMessage());
+      return;
+    }
+
     boolean wasPaused = isPaused();
     setPaused(true);
+    Platform.runLater(() -> resetSimulationWithConfig(config, wasPaused));
+  }
 
-    Platform.runLater(
-        () -> {
-          try {
-            Config config = Config.defaults();
+  /**
+   * Applies {@code key=value} overrides to the reference configuration.
+   *
+   * @param args the raw command tokens, starting with the command itself
+   * @return the derived configuration
+   * @throws IllegalArgumentException if a token is malformed or the key is unknown
+   */
+  private static Config parseResetArguments(String[] args) {
+    Config config = Config.defaults();
+    for (int i = 1; i < args.length; i++) {
+      String[] parts = args[i].split("=");
+      if (parts.length != 2) {
+        throw new IllegalArgumentException("Invalid argument format: " + args[i]);
+      }
+      int value;
+      try {
+        value = Integer.parseInt(parts[1]);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("Not a whole number: " + parts[1], e);
+      }
+      config = applyOverride(config, parts[0], value);
+    }
+    return config;
+  }
 
-            // Parse arguments
-            for (int i = 1; i < args.length; i++) {
-              String[] parts = args[i].split("=");
-              if (parts.length != 2) {
-                throw new IllegalArgumentException("Invalid argument format: " + args[i]);
-              }
-
-              String key = parts[0];
-              float value = Float.parseFloat(parts[1]);
-
-              switch (key) {
-                case "a":
-                case "animals":
-                  config = config.withWorldAnimals((int) value);
-                  break;
-                case "f":
-                case "foods":
-                  config = config.withWorldFoods((int) value);
-                  break;
-                case "n":
-                case "neurons":
-                  config = config.withBrainNeurons((int) value);
-                  break;
-                case "p":
-                case "photoreceptors":
-                  config = config.withEyeCells((int) value);
-                  break;
-                default:
-                  throw new IllegalArgumentException("Unknown parameter: " + key);
-              }
-            }
-
-            resetSimulationWithConfig(config, wasPaused);
-          } catch (IllegalArgumentException e) {
-            log.error("Failed to reset simulation", e);
-            println("Error: " + e.getMessage());
-          }
-        });
+  private static Config applyOverride(Config config, String key, int value) {
+    return switch (key) {
+      case "a", "animals" -> config.withWorldAnimals(value);
+      case "f", "foods" -> config.withWorldFoods(value);
+      case "n", "neurons" -> config.withBrainNeurons(value);
+      case "p", "photoreceptors" -> config.withEyeCells(value);
+      default -> throw new IllegalArgumentException("Unknown parameter: " + key);
+    };
   }
 
   /** Resets the simulation with the given config. */
@@ -592,6 +531,7 @@ public class SimulationApplication extends Application {
     // Create new simulation view
     var newSimulationView = new SimulationView(evolutionManager);
     newSimulationView.setPrefSize(800, 600);
+    newSimulationView.initializeView();
 
     // Find the parent and replace the old view with the new one
     VBox parent = (VBox) simulationView.getParent();

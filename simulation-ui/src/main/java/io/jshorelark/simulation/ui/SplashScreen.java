@@ -7,23 +7,17 @@
 package io.jshorelark.simulation.ui;
 
 import io.jshorelark.simulation.ui.icons.AppIcon;
-import java.util.Random;
-import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.application.Preloader;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.effect.DropShadow;
-import javafx.scene.effect.GaussianBlur;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -33,253 +27,95 @@ import javafx.util.Duration;
 /**
  * Splash screen shown during application startup.
  *
+ * <p>The animated background lives in {@link SplashBackground}; this class owns the window, the
+ * title, the progress bar and the status line.
+ *
  * @author Jose
  * @version $Id: $Id
  */
-public class SplashScreen extends Preloader {
-  private StageWrapper stage;
+public final class SplashScreen extends Preloader {
+
+  /** Minimum time the splash stays visible, so it cannot flash by on a fast start. */
+  private static final long MINIMUM_VISIBLE_MILLIS = 3_000L;
+
+  /** Hard limit on how long the splash can linger if the application never reports ready. */
+  private static final Duration AUTO_CLOSE_DELAY = Duration.seconds(15);
+
+  private Stage stage;
   private ProgressBar progress;
   private Text status;
-  private static final Random random = new Random();
   private long startTime;
   private Timeline autoCloseTimer;
-
-  /** Wrapper for Stage to prevent external modification. */
-  private static class StageWrapper {
-    private final Stage stage;
-
-    /**
-     * Creates a new stage wrapper.
-     *
-     * @param stage a {@link javafx.stage.Stage} object
-     */
-    private StageWrapper(Stage stage) {
-      this.stage = stage;
-    }
-
-    /**
-     * Sets the scene for the stage.
-     *
-     * @param scene a {@link javafx.scene.Scene} object
-     */
-    public void setScene(Scene scene) {
-      stage.setScene(scene);
-    }
-
-    /**
-     * Initializes the style for the stage.
-     *
-     * @param style a {@link javafx.stage.StageStyle} object
-     */
-    public void initStyle(StageStyle style) {
-      stage.initStyle(style);
-    }
-
-    /**
-     * Sets the x position of the stage.
-     *
-     * @param x a double
-     */
-    public void setX(double x) {
-      stage.setX(x);
-    }
-
-    /**
-     * Sets the y position of the stage.
-     *
-     * @param y a double
-     */
-    public void setY(double y) {
-      stage.setY(y);
-    }
-
-    /** Shows the stage. */
-    public void show() {
-      stage.show();
-    }
-
-    /** Hides the stage. */
-    public void hide() {
-      stage.hide();
-    }
-  }
 
   /** {@inheritDoc} */
   @Override
   public void start(Stage stage) {
-    this.stage = new StageWrapper(stage);
+    this.stage = stage;
     this.startTime = System.currentTimeMillis();
 
-    // Create main layout
-    var layout = new VBox(40);
-    layout.setAlignment(Pos.CENTER);
-    layout.getStyleClass().add("splash-screen");
+    var layout = createLayout();
+    var root = new StackPane(new SplashBackground().create(), layout);
+    root.getStyleClass().add("splash-root");
+    root.setOnMouseClicked(e -> tryClose());
 
-    // Add app icon (using larger icon)
-    var iconView = new ImageView(AppIcon.createIcons().get(5)); // 128x128 icon
+    var scene = new Scene(root, SplashBackground.WIDTH, SplashBackground.HEIGHT);
+    scene
+        .getStylesheets()
+        .add(SplashScreen.class.getResource("/css/dark-theme.css").toExternalForm());
+
+    stage.initStyle(StageStyle.UNDECORATED);
+    stage.setScene(scene);
+    centerOnScreen(stage, scene);
+    stage.show();
+
+    autoCloseTimer = new Timeline(new KeyFrame(AUTO_CLOSE_DELAY, e -> tryClose()));
+    autoCloseTimer.play();
+  }
+
+  private VBox createLayout() {
+    var iconView = new ImageView(AppIcon.createIcons().getLast());
     iconView.setEffect(new DropShadow(20, Color.BLACK));
-    layout.getChildren().add(iconView);
 
-    // Add title with larger font
     var title = new Text("JShorelark");
     title.getStyleClass().addAll("splash-title", "splash-title-large");
     title.setEffect(new DropShadow(10, Color.BLACK));
-    layout.getChildren().add(title);
 
-    // Add progress bar
     progress = new ProgressBar(0);
     progress.setPrefWidth(400);
     progress.getStyleClass().add("splash-progress");
-    layout.getChildren().add(progress);
 
-    // Add status text with larger font
     status = new Text("Loading...");
     status.getStyleClass().addAll("splash-status", "splash-status-large");
-    layout.getChildren().add(status);
 
-    // Create root layout with animated background
-    var root = new StackPane(createAnimatedBackground(), layout);
-    root.getStyleClass().add("splash-root");
+    var layout = new VBox(40, iconView, title, progress, status);
+    layout.setAlignment(Pos.CENTER);
+    layout.getStyleClass().add("splash-screen");
+    return layout;
+  }
 
-    // Create scene with doubled size
-    var scene = new Scene(root, 600, 400);
-    scene.getStylesheets().add(getClass().getResource("/css/dark-theme.css").toExternalForm());
-
-    // Configure stage
-    stage.initStyle(StageStyle.UNDECORATED);
-    stage.setScene(scene);
-
-    // Center on screen
-    var screenBounds = Screen.getPrimary().getVisualBounds();
-    stage.setX((screenBounds.getWidth() - scene.getWidth()) / 2);
-    stage.setY((screenBounds.getHeight() - scene.getHeight()) / 2);
-
-    // Add click handler to close after minimum time
-    root.setOnMouseClicked(e -> tryClose());
-
-    // Set up auto-close timer
-    autoCloseTimer = new Timeline(new KeyFrame(Duration.seconds(15), e -> tryClose()));
-    autoCloseTimer.play();
-
-    stage.show();
+  private static void centerOnScreen(Stage stage, Scene scene) {
+    var bounds = Screen.getPrimary().getVisualBounds();
+    stage.setX((bounds.getWidth() - scene.getWidth()) / 2);
+    stage.setY((bounds.getHeight() - scene.getHeight()) / 2);
   }
 
   private void tryClose() {
     long elapsed = System.currentTimeMillis() - startTime;
-    if (elapsed >= 3000) { // 3 seconds minimum
-      if (autoCloseTimer != null) {
-        autoCloseTimer.stop();
-      }
-      stage.hide();
+    if (elapsed < MINIMUM_VISIBLE_MILLIS || stage == null) {
+      return;
     }
-  }
-
-  private Pane createAnimatedBackground() {
-    var background = new Pane();
-    background.getStyleClass().add("splash-background");
-    background.setMouseTransparent(false); // Allow mouse events
-
-    // Create animated particles
-    for (int i = 0; i < 50; i++) { // More particles
-      var particle = createParticle();
-      background.getChildren().add(particle);
-
-      // Create animation
-      animateParticle(particle);
+    if (autoCloseTimer != null) {
+      autoCloseTimer.stop();
     }
-
-    // Add mouse move handler for particle interaction
-    background.setOnMouseMoved(
-        e -> {
-          // Create warp effect by moving particles away from mouse
-          for (var node : background.getChildren()) {
-            if (node instanceof Circle particle) {
-              double dx = particle.getTranslateX() - e.getX();
-              double dy = particle.getTranslateY() - e.getY();
-              double distance = Math.sqrt(dx * dx + dy * dy);
-
-              // Only affect particles within range
-              if (distance < 100) {
-                // Calculate repulsion force (stronger when closer)
-                double force = (1 - distance / 100) * 30;
-
-                // Apply force to move particle away from mouse
-                Timeline repulsion =
-                    new Timeline(
-                        new KeyFrame(
-                            Duration.millis(100),
-                            new KeyValue(
-                                particle.translateXProperty(),
-                                particle.getTranslateX() + (dx / distance) * force),
-                            new KeyValue(
-                                particle.translateYProperty(),
-                                particle.getTranslateY() + (dy / distance) * force),
-                            new KeyValue(
-                                particle.radiusProperty(),
-                                Math.min(6, particle.getRadius() * 1.5)), // Grow particle
-                            new KeyValue(particle.opacityProperty(), 0.8))); // Make brighter
-
-                repulsion.play();
-
-                // Return to normal size after repulsion
-                Timeline restore =
-                    new Timeline(
-                        new KeyFrame(
-                            Duration.millis(500),
-                            new KeyValue(particle.radiusProperty(), 3),
-                            new KeyValue(particle.opacityProperty(), 0.3)));
-                restore.setDelay(Duration.millis(100));
-                restore.play();
-              }
-            }
-          }
-        });
-
-    return background;
-  }
-
-  private Circle createParticle() {
-    var particle = new Circle(3);
-    particle.setFill(Color.rgb(255, 255, 255, 0.3));
-    particle.setEffect(new GaussianBlur(2));
-    particle.setTranslateX(random.nextDouble() * 600);
-    particle.setTranslateY(random.nextDouble() * 400);
-    return particle;
-  }
-
-  private void animateParticle(Circle particle) {
-    // Base movement animation
-    var baseMovement =
-        new Timeline(
-            new KeyFrame(
-                Duration.ZERO,
-                new KeyValue(particle.translateXProperty(), particle.getTranslateX()),
-                new KeyValue(particle.translateYProperty(), particle.getTranslateY()),
-                new KeyValue(particle.opacityProperty(), random.nextDouble() * 0.3 + 0.2)),
-            new KeyFrame(
-                Duration.seconds(3 + random.nextDouble() * 2),
-                new KeyValue(particle.translateXProperty(), random.nextDouble() * 600),
-                new KeyValue(particle.translateYProperty(), random.nextDouble() * 400),
-                new KeyValue(particle.opacityProperty(), random.nextDouble() * 0.3 + 0.2)));
-    baseMovement.setCycleCount(Animation.INDEFINITE);
-    baseMovement.setAutoReverse(true);
-
-    // Add subtle rotation for more organic movement
-    var rotation =
-        new Timeline(
-            new KeyFrame(Duration.ZERO, new KeyValue(particle.rotateProperty(), 0)),
-            new KeyFrame(Duration.seconds(2), new KeyValue(particle.rotateProperty(), 360)));
-    rotation.setCycleCount(Animation.INDEFINITE);
-
-    // Play both animations
-    baseMovement.play();
-    rotation.play();
+    stage.hide();
   }
 
   /** {@inheritDoc} */
   @Override
   public void handleProgressNotification(ProgressNotification pn) {
-    progress.setProgress(pn.getProgress());
+    if (progress != null) {
+      progress.setProgress(pn.getProgress());
+    }
   }
 
   /** {@inheritDoc} */
@@ -293,7 +129,7 @@ public class SplashScreen extends Preloader {
   /** {@inheritDoc} */
   @Override
   public void handleApplicationNotification(PreloaderNotification info) {
-    if (info instanceof StatusNotification notification) {
+    if (info instanceof StatusNotification notification && status != null) {
       status.setText(notification.status());
     }
   }

@@ -18,6 +18,12 @@ import javafx.scene.shape.SVGPath;
  */
 public final class SvgIcons {
 
+  /** Upper bound (exclusive) of the "low volume" band. */
+  private static final float VOLUME_LOW_THRESHOLD = 0.33f;
+
+  /** Upper bound (exclusive) of the "medium volume" band. */
+  private static final float VOLUME_MEDIUM_THRESHOLD = 0.67f;
+
   private SvgIcons() {
     // Utility class
   }
@@ -121,13 +127,14 @@ public final class SvgIcons {
   public static Node createSoundIcon(double size, Color color, float volume) {
     if (volume <= 0.0f) {
       return createMutedSoundIcon(size, color);
-    } else if (volume < 0.33f) {
-      return createVolumeLowIcon(size, color);
-    } else if (volume < 0.67f) {
-      return createVolumeMediumIcon(size, color);
-    } else {
-      return createVolumeHighIcon(size, color);
     }
+    if (volume < VOLUME_LOW_THRESHOLD) {
+      return createVolumeLowIcon(size, color);
+    }
+    if (volume < VOLUME_MEDIUM_THRESHOLD) {
+      return createVolumeMediumIcon(size, color);
+    }
+    return createVolumeHighIcon(size, color);
   }
 
   /**

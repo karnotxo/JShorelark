@@ -177,7 +177,8 @@ public class SoundManager {
       clip.setFramePosition(0);
       applyGain(clip);
       clip.start();
-    } catch (RuntimeException e) {
+    } catch (IllegalStateException e) {
+      // The line was closed or lost (device change); sound stays optional.
       log.warn("Failed to play sound effect", e);
     }
   }

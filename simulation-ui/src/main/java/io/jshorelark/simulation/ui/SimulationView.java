@@ -10,6 +10,7 @@ import io.jshorelark.simulation.bird.Bird;
 import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
 import io.jshorelark.simulation.ui.evolution.EvolutionManager;
+import java.util.Objects;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.Pane;
@@ -23,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
  * @version $Id: $Id
  */
 @Slf4j
-public class SimulationView extends Pane {
+public final class SimulationView extends Pane {
   /** Colors for dark theme. */
   private static final class DarkTheme {
     static final Color BIRD_COLOR = Color.web("#3498db");
@@ -55,6 +56,9 @@ public class SimulationView extends Pane {
 
   private Runnable onHoveredBirdChanged;
 
+  /** Distance in pixels between grid lines. */
+  private static final double GRID_SIZE = 50.0d;
+
   /** The canvas for drawing. */
   private final Canvas canvas;
 
@@ -73,20 +77,25 @@ public class SimulationView extends Pane {
     draw();
   }
 
-  /** Gets the current theme colors. */
-  private Object getCurrentTheme() {
-    return darkTheme ? DarkTheme.class : LightTheme.class;
-  }
-
   /**
    * Creates a new simulation view.
    *
-   * @param manager a {@link
-   *     io.jshorelark.simulation.ui.SimulationApplication.EvolutionManagerWrapper} object
+   * <p>The constructor only wires listeners; the canvas is attached by {@link #initializeView()},
+   * which the app calls after the view is part of the scene graph. Deferring keeps the constructor
+   * free of overridable {@code Pane} calls ({@code getChildren()}, {@code requestLayout()}), which
+   * would otherwise run before a subclass could finish initialising.
+   *
+   * @param manager the evolution manager this view renders
+   * @throws NullPointerException if {@code manager} is {@code null}
    */
   public SimulationView(EvolutionManager manager) {
     this.state = java.util.Objects.requireNonNull(manager, "manager");
     this.canvas = new Canvas();
+    log.debug("Created simulation view");
+  }
+
+  /** Attaches the canvas and starts tracking size and mouse input. */
+  public void initializeView() {
     getChildren().add(canvas);
 
     // Bind canvas size to parent size
@@ -97,10 +106,7 @@ public class SimulationView extends Pane {
     widthProperty().addListener((obs, oldVal, newVal) -> requestLayout());
     heightProperty().addListener((obs, oldVal, newVal) -> requestLayout());
 
-    // Mouse event handlers
     setupMouseHandlers();
-
-    log.debug("Created simulation view");
   }
 
   /** Sets up mouse event handlers. */
@@ -174,7 +180,8 @@ public class SimulationView extends Pane {
       }
     }
 
-    if (hoveredBird != newHoveredBird) {
+    // Bird does not override equals, so this is an identity check spelled without operator !=.
+    if (!Objects.equals(hoveredBird, newHoveredBird)) {
       hoveredBird = newHoveredBird;
       if (onHoveredBirdChanged != null) {
         onHoveredBirdChanged.run();
@@ -221,13 +228,18 @@ public class SimulationView extends Pane {
     gc.setLineWidth(1);
 
     double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
-
-    double gridSize = 50;
-    for (double x = 0.0d; x < worldScale; x += gridSize) {
-      gc.strokeLine(x, 0.0d, x, worldScale);
+    if (!(worldScale > 0.0d)) {
+      // Nothing to draw on: an unmeasured canvas, or a NaN from a not-yet-laid-out parent.
+      return;
     }
-    for (double y = 0.0d; y < worldScale; y += gridSize) {
-      gc.strokeLine(0.0d, y, worldScale, y);
+
+    // Count the lines once and step by index: an accumulating `x += size` loop over a non-finite
+    // bound would never terminate.
+    int lines = (int) Math.ceil(worldScale / GRID_SIZE);
+    for (int i = 0; i <= lines; i++) {
+      double offset = i * GRID_SIZE;
+      gc.strokeLine(offset, 0.0d, offset, worldScale);
+      gc.strokeLine(0.0d, offset, worldScale, offset);
     }
   }
 
@@ -369,8 +381,6 @@ public class SimulationView extends Pane {
     final double cellAngle = state.getEyeFovAngle() / state.getEyeCells();
 
     for (int i = 0; i < state.getEyeCells(); i++) {
-      double startAngle = fovStart + cellAngle * i;
-      double endAngle = startAngle + cellAngle;
       float input = eyeInputs[i];
 
       // Positive strength means food, negative means a wall, zero means nothing in range. Alpha
@@ -390,7 +400,7 @@ public class SimulationView extends Pane {
       gc.moveTo(screenPos.x(), screenPos.y());
 
       // Convert from model space (0° up, CCW) to screen space (0° right, CW)
-      double startScreenAngle = 90 - Math.toDegrees(startAngle);
+      double startScreenAngle = 90 - Math.toDegrees(fovStart + cellAngle * i);
       double sweepAngle = -Math.toDegrees(cellAngle); // Negative because we're going CW
 
       gc.arc(screenPos.x(), screenPos.y(), screenRange, screenRange, startScreenAngle, sweepAngle);

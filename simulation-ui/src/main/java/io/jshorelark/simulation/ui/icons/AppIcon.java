@@ -22,20 +22,28 @@ public final class AppIcon {
   /** Available icon sizes. */
   private static final int[] ICON_SIZES = {16, 24, 32, 48, 64, 128};
 
-  /** The cached application icon. */
-  private static Image cachedIcon = null;
+  /** Size of the icon returned by {@link #getImage()}. */
+  private static final int DEFAULT_SIZE = 48;
+
+  /**
+   * Holds the lazily loaded default icon.
+   *
+   * <p>The holder idiom gives thread-safe lazy initialisation with no lock and no mutable static
+   * field: the class loader guarantees the initialiser runs exactly once.
+   */
+  private static final class DefaultIconHolder {
+    private static final Image ICON = loadIcon(DEFAULT_SIZE);
+  }
 
   /**
    * Returns the application icon at the default size (48px).
    *
-   * @return a {@link javafx.scene.image.Image} object
+   * @return a {@link javafx.scene.image.Image} object, or {@code null} when the resource is missing
    */
   public static Image getImage() {
-    if (cachedIcon == null) {
-      cachedIcon = loadIcon(48);
-    }
-    // Return a new Image instance using the same URL to prevent modification of the cached instance
-    return cachedIcon != null ? new Image(cachedIcon.getUrl()) : null;
+    Image icon = DefaultIconHolder.ICON;
+    // A fresh instance per caller, so nobody can mutate the shared cached image.
+    return icon != null ? new Image(icon.getUrl()) : null;
   }
 
   /**
@@ -57,15 +65,16 @@ public final class AppIcon {
   /** Loads an icon at the specified size. */
   private static Image loadIcon(int size) {
     try {
-      String resourcePath = String.format("/icons/app_icon%d.png", size);
+      String resourcePath = "/icons/app_icon%d.png".formatted(size);
       var url = AppIcon.class.getResource(resourcePath);
       if (url == null) {
         log.error("Icon resource not found: {}", resourcePath);
         return null;
       }
       return new Image(url.toExternalForm());
-    } catch (Exception e) {
-      log.error("Failed to load icon of size " + size, e);
+    } catch (IllegalArgumentException e) {
+      // The URL exists but the image cannot be decoded; the UI keeps its default icon.
+      log.error("Failed to load icon of size {}", size, e);
       return null;
     }
   }

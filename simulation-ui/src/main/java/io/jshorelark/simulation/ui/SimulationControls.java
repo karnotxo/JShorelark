@@ -35,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
  * @version $Id: $Id
  */
 @Slf4j
-public class SimulationControls extends VBox {
+public final class SimulationControls extends VBox {
 
   /** Wrapper for SimulationApplication to prevent external modification. */
   private static class SimulationApplicationWrapper {

@@ -26,8 +26,12 @@
   <rule ref="category/java/errorprone.xml/AvoidDuplicateLiterals"/>
   <rule ref="category/java/errorprone.xml/AvoidLiteralsInIfCondition">
     <properties>
-      <!-- 0.0 / 1.0 / 2.0 guards are idiomatic in the numerical core. -->
-      <property name="ignoreMagicNumbers" value="-1,0,0.0,1,1.0,2,2.0"/>
+      <!--
+        0.0 / 1.0 / 2.0 guards are idiomatic in the numerical core, and the domain spells them as
+        float literals, so both the int and the float forms are accepted.
+      -->
+      <property name="ignoreMagicNumbers"
+                value="-1,-1.0,-1.0f,0,0.0,0.0f,1,1.0,1.0f,2,2.0,2.0f"/>
     </properties>
   </rule>
   <rule ref="category/java/errorprone.xml/BrokenNullCheck"/>

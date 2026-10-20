@@ -29,4 +29,24 @@
     <Bug pattern="URF_UNREAD_FIELD" />
   </Match>
 
+  <!--
+    JavaFX hands the preloader the splash Stage through Preloader#start(Stage). The framework owns
+    that instance and we must keep the reference to hide the window later, so there is no defensive
+    copy to make here.
+  -->
+  <Match>
+    <Class name="io.jshorelark.simulation.ui.SplashScreen" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+
+  <!--
+    The optimizer's grid reproduces the reference sweep value for value, and that sweep samples
+    3.14 rather than Math.PI. Replacing it with Math.PI would change which configurations are
+    benchmarked, so the "rough constant" is deliberate, not a typo.
+  -->
+  <Match>
+    <Class name="io.jshorelark.optimizer.simulate.GridGenerator" />
+    <Bug pattern="CNT_ROUGH_CONSTANT_VALUE" />
+  </Match>
+
 </FindBugsFilter>

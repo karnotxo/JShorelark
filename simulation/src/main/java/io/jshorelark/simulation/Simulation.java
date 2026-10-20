@@ -175,6 +175,18 @@ public final class Simulation {
     world.addBird(bird);
   }
 
+  /**
+   * Adds a single food item to the world.
+   *
+   * <p>Useful when a caller needs to place food at an exact position, which {@link #addFoods(int,
+   * Random)} cannot express.
+   *
+   * @param food the food item to add
+   */
+  public void addFood(Food food) {
+    world.addFood(food);
+  }
+
   /** Removes every bird from the world. */
   public void clearBirds() {
     world.clearBirds();
@@ -255,6 +267,11 @@ public final class Simulation {
             new BirdIndividual.Factory(config));
 
     List<BirdIndividual> individuals = world.getBirds().stream().map(BirdIndividual::of).toList();
+    if (config.gaReverse() == 1) {
+      // Rust's `ga_reverse` experiment: inverting the fitness turns selection into "survival of
+      // the least fit", which is how the original project demonstrates selection pressure.
+      individuals = BirdIndividual.reverseFitness(individuals);
+    }
     var result = algorithm.evolve(random, individuals);
 
     world.clearBirds();
