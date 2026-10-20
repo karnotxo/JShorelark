@@ -48,7 +48,7 @@ public final class Bird {
     this.position = Objects.requireNonNull(position, "position");
     this.previousPosition = position;
     this.rotation = rotation;
-    this.vision = new float[config.getEyeCells()];
+    this.vision = new float[config.eyeCells()];
     this.speed = speed;
     this.eye = Objects.requireNonNull(eye, "eye");
     this.brain = Objects.requireNonNull(brain, "brain");
@@ -68,7 +68,7 @@ public final class Bird {
    * @return the new bird
    */
   public static Bird create(BirdBrain brain, Vector2D position, Config config) {
-    return new Bird(position, 0.0f, config.getSimSpeedMax(), new BirdEye(config), brain, config);
+    return new Bird(position, 0.0f, config.simSpeedMax(), new BirdEye(config), brain, config);
   }
 
   /**
@@ -82,7 +82,7 @@ public final class Bird {
     return new Bird(
         Vector2D.random(random),
         random.nextFloat() * (float) (2 * Math.PI),
-        config.getSimSpeedMax(),
+        config.simSpeedMax(),
         new BirdEye(config),
         BirdBrain.random(random, config),
         config);
@@ -102,7 +102,7 @@ public final class Bird {
     return new Bird(
         Vector2D.random(random),
         random.nextFloat() * (float) (2 * Math.PI),
-        config.getSimSpeedMax(),
+        config.simSpeedMax(),
         new BirdEye(config),
         BirdBrain.fromChromosome(chromosome, config),
         config);
@@ -139,7 +139,7 @@ public final class Bird {
     vision = eye.processVision(position, rotation, foods);
 
     float[] controls = brain.processInputs(vision);
-    speed = Math.clamp(speed + controls[0], config.getSimSpeedMin(), config.getSimSpeedMax());
+    speed = Math.clamp(speed + controls[0], config.simSpeedMin(), config.simSpeedMax());
     rotation = normalizeAngle(rotation + controls[1]);
   }
 

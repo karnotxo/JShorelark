@@ -44,10 +44,10 @@ public final class World {
     Objects.requireNonNull(config, "config");
     Objects.requireNonNull(random, "random");
     var world = new World(config);
-    for (int i = 0; i < config.getWorldAnimals(); i++) {
+    for (int i = 0; i < config.worldAnimals(); i++) {
       world.birds.add(Bird.random(config, random));
     }
-    for (int i = 0; i < config.getWorldFoods(); i++) {
+    for (int i = 0; i < config.worldFoods(); i++) {
       world.foods.add(Food.random(random));
     }
     return world;

@@ -35,18 +35,18 @@ public final class BirdEye {
    */
   public BirdEye(Config config) {
     Objects.requireNonNull(config, "config");
-    if (config.getEyeFovRange() <= 0.0f) {
+    if (config.eyeFovRange() <= 0.0f) {
       throw new IllegalArgumentException("eyeFovRange must be positive");
     }
-    if (config.getEyeFovAngle() <= 0.0f) {
+    if (config.eyeFovAngle() <= 0.0f) {
       throw new IllegalArgumentException("eyeFovAngle must be positive");
     }
-    if (config.getEyeCells() <= 0) {
+    if (config.eyeCells() <= 0) {
       throw new IllegalArgumentException("eyeCells must be positive");
     }
-    this.fovRange = config.getEyeFovRange();
-    this.fovAngle = config.getEyeFovAngle();
-    this.cells = config.getEyeCells();
+    this.fovRange = config.eyeFovRange();
+    this.fovAngle = config.eyeFovAngle();
+    this.cells = config.eyeCells();
   }
 
   /**

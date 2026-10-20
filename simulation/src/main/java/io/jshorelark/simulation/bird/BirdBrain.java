@@ -28,8 +28,8 @@ public final class BirdBrain {
 
   private BirdBrain(LayeredNetwork network, Config config) {
     this.network = Objects.requireNonNull(network, "network");
-    this.speedAccel = config.getSimSpeedAccel();
-    this.rotationAccel = config.getSimRotationAccel();
+    this.speedAccel = config.simSpeedAccel();
+    this.rotationAccel = config.simRotationAccel();
   }
 
   /**
@@ -40,7 +40,7 @@ public final class BirdBrain {
    * @return a randomly initialised brain
    */
   public static BirdBrain random(Random random, Config config) {
-    return new BirdBrain(NeuralNetwork.random(random, config.getBrainTopology()), config);
+    return new BirdBrain(NeuralNetwork.random(random, config.brainTopology()), config);
   }
 
   /**
@@ -53,7 +53,7 @@ public final class BirdBrain {
    */
   public static BirdBrain fromChromosome(Chromosome chromosome, Config config) {
     return new BirdBrain(
-        NeuralNetwork.fromWeights(config.getBrainTopology(), chromosome.getGenes()), config);
+        NeuralNetwork.fromWeights(config.brainTopology(), chromosome.getGenes()), config);
   }
 
   /**
@@ -65,7 +65,7 @@ public final class BirdBrain {
    * @throws IllegalArgumentException if the network topology does not match the configuration
    */
   public static BirdBrain fromNetwork(LayeredNetwork network, Config config) {
-    if (!network.matchesTopology(config.getBrainTopology())) {
+    if (!network.matchesTopology(config.brainTopology())) {
       throw new IllegalArgumentException(
           "Network topology does not match the configured brain topology");
     }

@@ -15,6 +15,10 @@ import lombok.With;
  * <p>Mirrors Rust's {@code Config} field for field; the defaults are the reference values. All
  * spatial quantities are expressed in world units, where the world is the unit square.
  *
+ * <p>Accessors deliberately follow record style ({@code brainNeurons()}), because this is a value
+ * type, not a bean. {@code with…} methods exist so the UI can derive a variant configuration
+ * without losing the validation performed by the canonical constructor.
+ *
  * @param brainNeurons number of hidden neurons in each bird's brain
  * @param eyeFovRange maximum vision distance, in world units
  * @param eyeFovAngle total field of view, in radians
@@ -32,7 +36,7 @@ import lombok.With;
  * @param worldAnimals number of birds in the world
  * @param worldFoods number of food items in the world
  */
-@Builder
+@Builder(toBuilder = true)
 @With
 public record Config(
     int brainNeurons,
@@ -78,11 +82,11 @@ public record Config(
       throw new IllegalArgumentException("gaMutChance must be in [0, 1]: " + gaMutChance);
     }
     if (simSpeedMin < 0.0f || simSpeedMin > simSpeedMax) {
-      throw new IllegalArgumentException(
-          "simSpeedMin must be in [0, simSpeedMax]: " + simSpeedMin);
+      throw new IllegalArgumentException("simSpeedMin must be in [0, simSpeedMax]: " + simSpeedMin);
     }
     if (simRotationAccel < 0.0f) {
-      throw new IllegalArgumentException("simRotationAccel must not be negative: " + simRotationAccel);
+      throw new IllegalArgumentException(
+          "simRotationAccel must not be negative: " + simRotationAccel);
     }
     if (simGenerationLength <= 0) {
       throw new IllegalArgumentException(
