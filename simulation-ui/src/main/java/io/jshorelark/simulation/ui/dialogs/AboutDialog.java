@@ -6,9 +6,14 @@
  */
 package io.jshorelark.simulation.ui.dialogs;
 
+import io.jshorelark.simulation.ui.Messages;
 import io.jshorelark.simulation.ui.controls.ControlBuilder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.layout.StackPane;
@@ -48,6 +53,12 @@ public final class AboutDialog {
   /** Dialog height, in pixels. */
   private static final double HEIGHT = 400.0;
 
+  /** Marks where a sentence's link goes, in the bundle. */
+  private static final String LINK_PLACEHOLDER = "{0}";
+
+  /** Blank line between the two paragraphs. */
+  private static final String BLANK_LINE = "\n\n";
+
   /**
    * Shows the about dialog.
    *
@@ -58,7 +69,7 @@ public final class AboutDialog {
     dialog.initOwner(owner);
     dialog.initModality(Modality.APPLICATION_MODAL);
     dialog.initStyle(StageStyle.TRANSPARENT);
-    dialog.setTitle("JShorelark");
+    dialog.setTitle(Messages.text(Messages.ABOUT_TITLE));
     dialog.setResizable(false);
     dialog.getIcons().addAll(owner.getIcons());
 
@@ -83,20 +94,28 @@ public final class AboutDialog {
   }
 
   private static VBox createContent() {
-    var title = new Text("JShorelark");
+    var title = new Text(Messages.text(Messages.ABOUT_TITLE));
     title.getStyleClass().add("about-title");
 
-    var version = new Text("Version " + VERSION);
+    var version = new Text(Messages.formatted(Messages.ABOUT_VERSION, VERSION));
     version.getStyleClass().add("about-version");
 
-    var description =
-        new TextFlow(
-            createStyledText("A Java port of "),
-            createLink("Shorelark", ORIGINAL_PROJECT_URL),
-            createStyledText(", a bird evolution simulation originally written in Rust.\n\n"),
-            createStyledText("Based on the blog post series "),
-            createLink("Learning to Fly", BLOG_URL),
-            createStyledText(" by Patryk Wychowaniec."));
+    var description = new TextFlow();
+    description
+        .getChildren()
+        .addAll(
+            sentenceWithLink(
+                Messages.text(Messages.ABOUT_DESCRIPTION),
+                Messages.text(Messages.ABOUT_LINK_UPSTREAM),
+                ORIGINAL_PROJECT_URL));
+    description.getChildren().add(createStyledText(BLANK_LINE));
+    description
+        .getChildren()
+        .addAll(
+            sentenceWithLink(
+                Messages.text(Messages.ABOUT_BASED_ON),
+                Messages.text(Messages.ABOUT_LINK_BLOG),
+                BLOG_URL));
     description.setTextAlignment(TextAlignment.CENTER);
     description.getStyleClass().add("about-description");
     description.setMaxWidth(360);
@@ -121,6 +140,33 @@ public final class AboutDialog {
           dialog.setX(e.getScreenX() + offset[0]);
           dialog.setY(e.getScreenY() + offset[1]);
         });
+  }
+
+  /**
+   * Builds a sentence whose link is a styled node instead of plain text.
+   *
+   * <p>The bundle stores the whole sentence with a {@code {0}} where the link belongs, so a
+   * translation may move the link anywhere in the phrase. This splits the pattern on that marker
+   * and interleaves the text with an actual {@link Hyperlink}.
+   *
+   * @param pattern the sentence from the bundle
+   * @param label the link's visible text
+   * @param url the address the link opens
+   * @return the text nodes and the link, in order
+   */
+  private static List<Node> sentenceWithLink(String pattern, String label, String url) {
+    String[] parts = Pattern.compile(Pattern.quote(LINK_PLACEHOLDER)).split(pattern, -1);
+    var nodes = new ArrayList<Node>(parts.length * 2);
+    for (int i = 0; i < parts.length; i++) {
+      if (!parts[i].isEmpty()) {
+        nodes.add(createStyledText(parts[i]));
+      }
+      // The marker sat between parts, so every part but the last is followed by the link.
+      if (i < parts.length - 1) {
+        nodes.add(createLink(label, url));
+      }
+    }
+    return nodes;
   }
 
   /** Creates a styled text node that respects the current theme. */

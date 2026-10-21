@@ -110,10 +110,14 @@ was removed and `Food` became a record with `position()`.
 
 ## Engineering debt
 
-- [x] `SimulationControls.SimulationApplicationWrapper` duplicates the application's public surface
-  just to hide it. An interface implemented by `SimulationApplication` would remove the wrapper.
-- [x] UI strings are inline English literals. They are centralised per class but not externalised;
-  move them to a resource bundle when a second locale is needed.
+- [x] `SimulationControls.SimulationApplicationWrapper` duplicated the application's public surface
+  just to hide it. `SimulationCommands` now names the contract the panel uses and
+  `SimulationApplication` implements it, so the wrapper is gone and the panel is substitutable.
+- [x] UI strings were inline English literals. Chrome, tooltips, readouts, chart labels and the
+  About dialog now live in `messages.properties` behind `Messages`, with `MessagesTest` failing on a
+  key that has no value. The embedded terminal's welcome text and its command error messages are
+  still inline: they are a command reference rather than an interface, so they move when the
+  terminal itself gets a help system.
 - [x] `SimulationView` mixes layout, drawing and hit-testing. It is coherent today, but splitting
   the bird inspector out would keep the paint path minimal.
 - [ ] `mockito` warns about self-attaching its agent on JDK 21. Add it as a

@@ -305,7 +305,7 @@ public class SimulationApplication extends Application implements SimulationComm
 
     var scene = new Scene(mainLayout);
     scene.getStylesheets().add(getThemeStylesheet());
-    stage.setTitle("JShorelark");
+    stage.setTitle(Messages.text(Messages.WINDOW_TITLE));
     stage.getIcons().addAll(AppIcon.createIcons());
     stage.setScene(scene);
     return scene;

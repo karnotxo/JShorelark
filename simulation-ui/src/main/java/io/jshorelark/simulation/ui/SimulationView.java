@@ -276,10 +276,33 @@ public final class SimulationView extends Pane {
     // Draw info text
     gc.setFill(darkTheme ? DarkTheme.INFO_TEXT : LightTheme.INFO_TEXT);
     gc.setFont(javafx.scene.text.Font.font("Monospaced", 12));
-    gc.fillText(String.format("Position: (%.0f, %.0f)", pos.x(), pos.y()), boxX + 10, boxY + 20);
     gc.fillText(
-        String.format("Rotation: %.1f°", Math.toDegrees(bird.getRotation())), boxX + 10, boxY + 40);
-    gc.fillText(String.format("Fitness: %.2f", bird.getSatiation()), boxX + 10, boxY + 60);
+        Messages.formatted(Messages.INSPECTOR_POSITION, fmt("%.0f", pos.x()), fmt("%.0f", pos.y())),
+        boxX + 10,
+        boxY + 20);
+    gc.fillText(
+        Messages.formatted(
+            Messages.INSPECTOR_ROTATION, fmt("%.1f°", Math.toDegrees(bird.getRotation()))),
+        boxX + 10,
+        boxY + 40);
+    gc.fillText(
+        Messages.formatted(Messages.INSPECTOR_FITNESS, fmt("%.2f", bird.getSatiation())),
+        boxX + 10,
+        boxY + 60);
+  }
+
+  /**
+   * Formats a number for the inspector.
+   *
+   * <p>The pattern stays here because it is presentation, not prose: the sentence around the value
+   * and the required precision are separate decisions, and a translation only supplies the former.
+   *
+   * @param pattern a {@code String.format} pattern
+   * @param value the number to format
+   * @return the formatted number
+   */
+  private static String fmt(String pattern, double value) {
+    return String.format(java.util.Locale.ROOT, pattern, value);
   }
 
   /** Draws a bird. */

@@ -40,8 +40,8 @@ public final class FitnessChart extends LineChart<Number, Number> {
   /** Creates a new fitness chart. */
   public FitnessChart() {
     super(
-        new NumberAxis("Generation", 0, INITIAL_GENERATIONS, 10),
-        new NumberAxis("Fitness", 0, INITIAL_FITNESS, 0.1));
+        new NumberAxis(Messages.text(Messages.CHART_GENERATION), 0, INITIAL_GENERATIONS, 10),
+        new NumberAxis(Messages.text(Messages.CHART_FITNESS), 0, INITIAL_FITNESS, 0.1));
 
     horizontalAxis = (NumberAxis) getXAxis();
     verticalAxis = (NumberAxis) getYAxis();
@@ -49,10 +49,10 @@ public final class FitnessChart extends LineChart<Number, Number> {
     verticalAxis.setAnimated(false);
     setAnimated(false);
 
-    maxSeries = namedSeries("Max");
-    avgSeries = namedSeries("Avg");
-    medianSeries = namedSeries("Median");
-    minSeries = namedSeries("Min");
+    maxSeries = namedSeries(Messages.text(Messages.CHART_MAX));
+    avgSeries = namedSeries(Messages.text(Messages.CHART_AVG));
+    medianSeries = namedSeries(Messages.text(Messages.CHART_MEDIAN));
+    minSeries = namedSeries(Messages.text(Messages.CHART_MIN));
 
     setCreateSymbols(false);
     setLegendVisible(true);

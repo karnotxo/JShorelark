@@ -162,7 +162,7 @@ public final class SimulationControls extends VBox {
   private Button createPlayPauseButton() {
     var button =
         ControlBuilder.button()
-            .tooltip("Play/Pause simulation (Space)")
+            .tooltip(Messages.text(Messages.CONTROLS_RESUME))
             .onAction(e -> togglePlayPause())
             .build();
     button.setGraphic(SvgIcons.createPlayIcon(16, Color.GRAY));
@@ -185,7 +185,7 @@ public final class SimulationControls extends VBox {
   private Button createResetButton() {
     final var result =
         ControlBuilder.button()
-            .tooltip("Reset simulation (R)")
+            .tooltip(Messages.text(Messages.CONTROLS_RESET))
             .onAction(e -> Platform.runLater(app::resetSimulation))
             .build();
     result.setGraphic(SvgIcons.createResetIcon(16, Color.GRAY));
@@ -197,7 +197,7 @@ public final class SimulationControls extends VBox {
   private Button createAddFoodButton() {
     final var result =
         ControlBuilder.button()
-            .tooltip("Add more food (F)")
+            .tooltip(Messages.text(Messages.CONTROLS_ADD_FOOD))
             .onAction(e -> Platform.runLater(() -> app.addFood(10)))
             .build();
     result.setGraphic(SvgIcons.createFoodIcon(16, Color.GRAY));
@@ -209,7 +209,7 @@ public final class SimulationControls extends VBox {
   private Button createMuteButton() {
     final var result =
         ControlBuilder.button()
-            .tooltip("Toggle sound (M)")
+            .tooltip(Messages.text(Messages.CONTROLS_TOGGLE_SOUND))
             .onAction(
                 e -> {
                   Platform.runLater(
@@ -243,7 +243,7 @@ public final class SimulationControls extends VBox {
         .min(0.1)
         .max(5.0)
         .value(1.0)
-        .tooltip("Simulation speed")
+        .tooltip(Messages.text(Messages.CONTROLS_SPEED))
         .onValueChanged(
             (v, o, n) -> Platform.runLater(() -> app.setSimulationSpeed(n.doubleValue())))
         .build();
@@ -255,7 +255,7 @@ public final class SimulationControls extends VBox {
             .min(0.0)
             .max(1.0)
             .value(app.getVolume())
-            .tooltip("Sound volume")
+            .tooltip(Messages.text(Messages.CONTROLS_VOLUME))
             .onValueChanged(
                 (v, o, n) -> {
                   Platform.runLater(
@@ -311,10 +311,10 @@ public final class SimulationControls extends VBox {
   private void updatePlayPauseButton() {
     if (app.isPaused()) {
       playButton.setGraphic(SvgIcons.createPlayIcon(16, Color.GRAY));
-      playButton.setTooltip(new Tooltip("Resume simulation (Space)"));
+      playButton.setTooltip(new Tooltip(Messages.text(Messages.CONTROLS_RESUME)));
     } else {
       playButton.setGraphic(SvgIcons.createPauseIcon(16, Color.GRAY));
-      playButton.setTooltip(new Tooltip("Pause simulation (Space)"));
+      playButton.setTooltip(new Tooltip(Messages.text(Messages.CONTROLS_PAUSE)));
     }
   }
 
@@ -342,8 +342,9 @@ public final class SimulationControls extends VBox {
 
   /** Updates the statistics labels. */
   private void updateStats() {
-    generationLabel.setText(String.format("Generation: %d", app.getGeneration()));
-    populationLabel.setText(String.format("Population: %d", app.getPopulationSize()));
+    generationLabel.setText(Messages.formatted(Messages.CONTROLS_GENERATION, app.getGeneration()));
+    populationLabel.setText(
+        Messages.formatted(Messages.CONTROLS_POPULATION, app.getPopulationSize()));
     bestFitnessLabel.setText(String.format("Best Fitness: %.1f", app.getBestFitness()));
 
     // Update progress bar

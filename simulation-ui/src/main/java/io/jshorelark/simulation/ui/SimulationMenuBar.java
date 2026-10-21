@@ -55,26 +55,31 @@ final class SimulationMenuBar extends MenuBar {
    * @param actions what each item does
    */
   SimulationMenuBar(Stage owner, boolean darkTheme, boolean soundEnabled, Actions actions) {
-    var resetItem = new MenuItem("Reset");
+    var resetItem = new MenuItem(Messages.text(Messages.MENU_RESET));
     resetItem.setOnAction(e -> actions.reset().run());
-    var exitItem = new MenuItem("Exit");
+    var exitItem = new MenuItem(Messages.text(Messages.MENU_EXIT));
     exitItem.setOnAction(e -> Platform.exit());
 
-    var themeItem = new CheckMenuItem("Dark Theme");
+    var themeItem = new CheckMenuItem(Messages.text(Messages.MENU_DARK_THEME));
     themeItem.setSelected(darkTheme);
     themeItem.setOnAction(e -> actions.toggleTheme().run());
 
-    var soundItem = new CheckMenuItem("Sound Effects");
+    var soundItem = new CheckMenuItem(Messages.text(Messages.MENU_SOUND_EFFECTS));
     soundItem.setSelected(soundEnabled);
     soundItem.setOnAction(e -> actions.setSoundEnabled().accept(soundItem.isSelected()));
 
-    var aboutItem = new MenuItem("About");
+    var aboutItem = new MenuItem(Messages.text(Messages.MENU_ABOUT));
     aboutItem.setOnAction(e -> AboutDialog.show(owner));
 
     getMenus()
         .addAll(
-            new Menu("File", null, resetItem, new SeparatorMenuItem(), exitItem),
-            new Menu("View", null, themeItem, soundItem),
-            new Menu("Help", null, aboutItem));
+            new Menu(
+                Messages.text(Messages.MENU_FILE),
+                null,
+                resetItem,
+                new SeparatorMenuItem(),
+                exitItem),
+            new Menu(Messages.text(Messages.MENU_VIEW), null, themeItem, soundItem),
+            new Menu(Messages.text(Messages.MENU_HELP), null, aboutItem));
   }
 }

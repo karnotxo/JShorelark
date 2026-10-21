@@ -76,7 +76,7 @@ public final class SplashScreen extends Preloader {
     var iconView = new ImageView(AppIcon.createIcons().getLast());
     iconView.setEffect(new DropShadow(20, Color.BLACK));
 
-    var title = new Text("JShorelark");
+    var title = new Text(Messages.text(Messages.WINDOW_TITLE));
     title.getStyleClass().addAll("splash-title", "splash-title-large");
     title.setEffect(new DropShadow(10, Color.BLACK));
 
@@ -84,7 +84,7 @@ public final class SplashScreen extends Preloader {
     progress.setPrefWidth(400);
     progress.getStyleClass().add("splash-progress");
 
-    status = new Text("Loading...");
+    status = new Text(Messages.text(Messages.SPLASH_LOADING));
     status.getStyleClass().addAll("splash-status", "splash-status-large");
 
     var layout = new VBox(40, iconView, title, progress, status);
