@@ -118,8 +118,11 @@ was removed and `Food` became a record with `position()`.
   key that has no value. The embedded terminal's welcome text and its command error messages are
   still inline: they are a command reference rather than an interface, so they move when the
   terminal itself gets a help system.
-- [x] `SimulationView` mixes layout, drawing and hit-testing. It is coherent today, but splitting
-  the bird inspector out would keep the paint path minimal.
+- [x] `SimulationView` mixed layout, drawing and hit-testing. Drawing now lives in
+  `render/` — `WorldRenderer` (grid, food, birds), `BirdInspectorRenderer` (the details box) and
+  `SceneTransform` (the model-to-screen mapping, previously duplicated in five methods) — while the
+  view keeps the canvas lifecycle, hover state and repaint decision. `SceneTransformTest` covers
+  the mapping, which is now pure arithmetic instead of a copy per drawing routine.
 - [ ] `mockito` warns about self-attaching its agent on JDK 21. Add it as a
   `-javaagent` in the Surefire configuration before it becomes an error.
 - [ ] `rust-ref/` holds the reference Rust sources read during the audit and is committed, but it
