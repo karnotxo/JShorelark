@@ -7,57 +7,46 @@
 package io.jshorelark.simulation.ui;
 
 import io.jshorelark.simulation.bird.Bird;
-import io.jshorelark.simulation.food.Food;
 import io.jshorelark.simulation.physics.Vector2D;
 import io.jshorelark.simulation.ui.evolution.EvolutionManager;
+import io.jshorelark.simulation.ui.render.BirdInspectorRenderer;
+import io.jshorelark.simulation.ui.render.RenderTheme;
+import io.jshorelark.simulation.ui.render.SceneTransform;
+import io.jshorelark.simulation.ui.render.WorldRenderer;
 import java.util.Objects;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
-import javafx.scene.paint.Color;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * Canvas that displays the simulation state.
+ *
+ * <p>This type owns the canvas lifecycle, the hover state and the decision to repaint. What to
+ * paint lives in {@link WorldRenderer} and {@link BirdInspectorRenderer}, and how model space maps
+ * to pixels lives in {@link SceneTransform}; the view itself never touches a coordinate.
+ *
+ * <p>Hit-testing stays here because it is input handling, not drawing: it needs the pointer and the
+ * population, not the canvas contents.
  *
  * @author Jose
  * @version $Id: $Id
  */
 @Slf4j
 public final class SimulationView extends Pane {
-  /** Colors for dark theme. */
-  private static final class DarkTheme {
-    static final Color BIRD_COLOR = Color.web("#3498db");
-    static final Color BIRD_OUTLINE_COLOR = Color.web("#2980b9");
-    static final Color EYE_COLOR = Color.web("#2ecc71");
-    static final Color FOOD_COLOR = Color.web("#e74c3c");
-    static final Color TRAIL_COLOR = Color.rgb(255, 255, 255, 0.2);
-    static final Color SENSOR_EMPTY_COLOR = Color.rgb(255, 255, 255, 0.1);
-    static final Color GRID_COLOR = Color.rgb(255, 255, 255, 0.1);
-    static final Color INFO_BOX_BG = Color.rgb(0, 0, 0, 0.8);
-    static final Color INFO_TEXT = Color.WHITE;
-  }
-
-  /** Colors for light theme. */
-  private static final class LightTheme {
-    static final Color BIRD_COLOR = Color.web("#2980b9");
-    static final Color BIRD_OUTLINE_COLOR = Color.web("#1a5276");
-    static final Color EYE_COLOR = Color.web("#27ae60");
-    static final Color FOOD_COLOR = Color.web("#c0392b");
-    static final Color TRAIL_COLOR = Color.rgb(0, 0, 0, 0.2);
-    static final Color SENSOR_EMPTY_COLOR = Color.rgb(0, 0, 0, 0.1);
-    static final Color GRID_COLOR = Color.rgb(0, 0, 0, 0.1);
-    static final Color INFO_BOX_BG = Color.rgb(255, 255, 255, 0.9);
-    static final Color INFO_TEXT = Color.BLACK;
-  }
 
   /** The simulation state to render; all values are read through it, never recomputed here. */
   private final EvolutionManager state;
 
-  private Runnable onHoveredBirdChanged;
+  /** Paints grid, food and birds. */
+  private final WorldRenderer worldRenderer = new WorldRenderer();
 
-  /** Distance in pixels between grid lines. */
-  private static final double GRID_SIZE = 50.0d;
+  /** Paints the details box for the hovered bird. */
+  private final BirdInspectorRenderer inspectorRenderer = new BirdInspectorRenderer();
+
+  /** Notified when the hovered bird changes; may be {@code null}. */
+  private Runnable onHoveredBirdChanged;
 
   /** The canvas for drawing. */
   private final Canvas canvas;
@@ -65,17 +54,11 @@ public final class SimulationView extends Pane {
   /** Mouse position in screen coordinates. */
   private Vector2D screenMousePos = Vector2D.ZERO;
 
-  /** Currently hovered bird. */
-  private Bird hoveredBird = null;
+  /** Currently hovered bird, or {@code null} when the pointer is not over one. */
+  private Bird hoveredBird;
 
-  /** Whether dark theme is enabled. */
-  private boolean darkTheme = true;
-
-  /** Sets the theme. */
-  public void setTheme(boolean dark) {
-    this.darkTheme = dark;
-    draw();
-  }
+  /** The active palette. */
+  private RenderTheme theme = RenderTheme.DARK;
 
   /**
    * Creates a new simulation view.
@@ -89,9 +72,19 @@ public final class SimulationView extends Pane {
    * @throws NullPointerException if {@code manager} is {@code null}
    */
   public SimulationView(EvolutionManager manager) {
-    this.state = java.util.Objects.requireNonNull(manager, "manager");
+    this.state = Objects.requireNonNull(manager, "manager");
     this.canvas = new Canvas();
     log.debug("Created simulation view");
+  }
+
+  /**
+   * Selects the palette.
+   *
+   * @param dark {@code true} for the dark theme
+   */
+  public void setTheme(boolean dark) {
+    this.theme = dark ? RenderTheme.DARK : RenderTheme.LIGHT;
+    draw();
   }
 
   /** Attaches the canvas and starts tracking size and mouse input. */
@@ -115,8 +108,11 @@ public final class SimulationView extends Pane {
     canvas.setOnMouseExited(
         e -> {
           screenMousePos = Vector2D.ZERO;
-          hoveredBird = null;
-          draw();
+          if (hoveredBird != null) {
+            hoveredBird = null;
+            notifyHoveredBirdChanged();
+            draw();
+          }
         });
   }
 
@@ -146,7 +142,7 @@ public final class SimulationView extends Pane {
   /**
    * Sets a callback to be called when the hovered bird changes.
    *
-   * @param callback the callback to run
+   * @param callback the callback to run, or {@code null} to clear it
    */
   public void setOnHoveredBirdChanged(Runnable callback) {
     this.onHoveredBirdChanged = callback;
@@ -157,24 +153,24 @@ public final class SimulationView extends Pane {
    *
    * @param event mouse event
    */
-  private void handleMouseMoved(javafx.scene.input.MouseEvent event) {
+  private void handleMouseMoved(MouseEvent event) {
     screenMousePos = new Vector2D((float) event.getX(), (float) event.getY());
     updateHoveredBird();
   }
 
   /** Updates the currently hovered bird based on mouse position. */
   private void updateHoveredBird() {
+    SceneTransform transform = transform();
+    Vector2D worldMousePos = transform.toWorld(screenMousePos);
+    double worldBirdSize = state.getBirdSize();
+
     Bird newHoveredBird = null;
     double closestDistance = Double.MAX_VALUE;
-
-    // Convert screen mouse position to world coordinates for distance calculation
-    Vector2D worldMousePos = screenToWorld(screenMousePos);
-    double worldBirdSize = state.getBirdSize(); // Already in world coordinates
-
     for (Bird bird : state.getBirds()) {
-      Vector2D worldBirdPos = bird.getPosition(); // Already in world coordinates
-      double distance = worldMousePos.subtract(worldBirdPos).length();
-      if (distance < worldBirdSize * 2 && distance < closestDistance) {
+      double distance = worldMousePos.subtract(bird.getPosition()).length();
+      // Twice the bird size, so the target is usable on a small window without stealing clicks
+      // from a neighbour: the loop keeps the nearest match.
+      if (distance < worldBirdSize * 2.0 && distance < closestDistance) {
         newHoveredBird = bird;
         closestDistance = distance;
       }
@@ -183,10 +179,15 @@ public final class SimulationView extends Pane {
     // Bird does not override equals, so this is an identity check spelled without operator !=.
     if (!Objects.equals(hoveredBird, newHoveredBird)) {
       hoveredBird = newHoveredBird;
-      if (onHoveredBirdChanged != null) {
-        onHoveredBirdChanged.run();
-      }
+      notifyHoveredBirdChanged();
       draw();
+    }
+  }
+
+  /** Invokes the hover callback when one is registered. */
+  private void notifyHoveredBirdChanged() {
+    if (onHoveredBirdChanged != null) {
+      onHoveredBirdChanged.run();
     }
   }
 
@@ -198,287 +199,21 @@ public final class SimulationView extends Pane {
   /** Draws the simulation state. */
   private void draw() {
     GraphicsContext gc = canvas.getGraphicsContext2D();
-    // Enable antialiasing
-    gc.setImageSmoothing(true);
-    gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
+    gc.clearRect(0.0, 0.0, canvas.getWidth(), canvas.getHeight());
 
-    // Draw background grid
-    drawGrid(gc);
-
-    // Draw food
-    gc.setFill(darkTheme ? DarkTheme.FOOD_COLOR : LightTheme.FOOD_COLOR);
-    for (Food food : state.getFoods()) {
-      drawFood(gc, food);
-    }
-
-    // Draw birds
-    for (Bird bird : state.getBirds()) {
-      drawBird(gc, bird);
-    }
-
-    // Draw hover effects
+    SceneTransform transform = transform();
+    worldRenderer.draw(gc, state, theme, transform);
     if (hoveredBird != null) {
-      drawBirdDetails(gc, hoveredBird);
-    }
-  }
-
-  /** Draws a background grid. */
-  private void drawGrid(GraphicsContext gc) {
-    gc.setStroke(darkTheme ? DarkTheme.GRID_COLOR : LightTheme.GRID_COLOR);
-    gc.setLineWidth(1);
-
-    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
-    if (!(worldScale > 0.0d)) {
-      // Nothing to draw on: an unmeasured canvas, or a NaN from a not-yet-laid-out parent.
-      return;
-    }
-
-    // Count the lines once and step by index: an accumulating `x += size` loop over a non-finite
-    // bound would never terminate.
-    int lines = (int) Math.ceil(worldScale / GRID_SIZE);
-    for (int i = 0; i <= lines; i++) {
-      double offset = i * GRID_SIZE;
-      gc.strokeLine(offset, 0.0d, offset, worldScale);
-      gc.strokeLine(0.0d, offset, worldScale, offset);
-    }
-  }
-
-  /** Draws a food item. */
-  private void drawFood(GraphicsContext gc, Food food) {
-    gc.setFill(darkTheme ? DarkTheme.FOOD_COLOR : LightTheme.FOOD_COLOR);
-    Vector2D screenPos = worldToScreen(food.position());
-    double screenSize = getScreenFoodSize();
-    gc.fillOval(
-        screenPos.x() - screenSize / 2, screenPos.y() - screenSize / 2, screenSize, screenSize);
-  }
-
-  /**
-   * Draws detailed information about a bird.
-   *
-   * @param bird bird to draw details for
-   */
-  private void drawBirdDetails(GraphicsContext gc, Bird bird) {
-    Vector2D pos = worldToScreen(bird.getPosition());
-
-    // Draw info box
-    double boxWidth = 150;
-    double boxHeight = 80;
-    double boxX = Math.min(pos.x() + 20, canvas.getWidth() - boxWidth - 10);
-    double boxY = Math.min(pos.y() + 20, canvas.getHeight() - boxHeight - 10);
-
-    // Draw box background
-    gc.setFill(darkTheme ? DarkTheme.INFO_BOX_BG : LightTheme.INFO_BOX_BG);
-    gc.setStroke(darkTheme ? DarkTheme.BIRD_COLOR : LightTheme.BIRD_COLOR);
-    gc.setLineWidth(1);
-    gc.fillRoundRect(boxX, boxY, boxWidth, boxHeight, 5, 5);
-    gc.strokeRoundRect(boxX, boxY, boxWidth, boxHeight, 5, 5);
-
-    // Draw info text
-    gc.setFill(darkTheme ? DarkTheme.INFO_TEXT : LightTheme.INFO_TEXT);
-    gc.setFont(javafx.scene.text.Font.font("Monospaced", 12));
-    gc.fillText(
-        Messages.formatted(Messages.INSPECTOR_POSITION, fmt("%.0f", pos.x()), fmt("%.0f", pos.y())),
-        boxX + 10,
-        boxY + 20);
-    gc.fillText(
-        Messages.formatted(
-            Messages.INSPECTOR_ROTATION, fmt("%.1f°", Math.toDegrees(bird.getRotation()))),
-        boxX + 10,
-        boxY + 40);
-    gc.fillText(
-        Messages.formatted(Messages.INSPECTOR_FITNESS, fmt("%.2f", bird.getSatiation())),
-        boxX + 10,
-        boxY + 60);
-  }
-
-  /**
-   * Formats a number for the inspector.
-   *
-   * <p>The pattern stays here because it is presentation, not prose: the sentence around the value
-   * and the required precision are separate decisions, and a translation only supplies the former.
-   *
-   * @param pattern a {@code String.format} pattern
-   * @param value the number to format
-   * @return the formatted number
-   */
-  private static String fmt(String pattern, double value) {
-    return String.format(java.util.Locale.ROOT, pattern, value);
-  }
-
-  /** Draws a bird. */
-  private void drawBird(GraphicsContext gc, Bird bird) {
-    // Trail and sensors are drawn in world coordinates, before the local transform is applied.
-    drawBirdTrail(gc, bird);
-    drawEyeSensors(gc, bird);
-
-    Vector2D screenPos = worldToScreen(bird.getPosition());
-    gc.save();
-    gc.translate(screenPos.x(), screenPos.y());
-    // Convert from model space (0° up, CCW) to screen space (0° right, CW)
-    gc.rotate(Math.toDegrees(bird.getRotation()) - 90);
-
-    double screenSize = getScreenBirdSize();
-
-    // Draw bird body
-    gc.setFill(darkTheme ? DarkTheme.BIRD_COLOR : LightTheme.BIRD_COLOR);
-    gc.setStroke(darkTheme ? DarkTheme.BIRD_OUTLINE_COLOR : LightTheme.BIRD_OUTLINE_COLOR);
-    gc.setLineWidth(1.5);
-
-    // Main body (triangle)
-    gc.beginPath();
-    gc.moveTo(screenSize, 0);
-    gc.lineTo(-screenSize, -screenSize / 2);
-    gc.lineTo(-screenSize, screenSize / 2);
-    gc.closePath();
-    gc.fill();
-    gc.stroke();
-
-    // Draw wings
-    gc.beginPath();
-    gc.moveTo(-screenSize, -screenSize / 2);
-    gc.lineTo(-screenSize * 1.5, -screenSize);
-    gc.moveTo(-screenSize, screenSize / 2);
-    gc.lineTo(-screenSize * 1.5, screenSize);
-    gc.stroke();
-
-    // Draw tail
-    gc.beginPath();
-    gc.moveTo(-screenSize, 0);
-    gc.lineTo(-screenSize * 1.8, -screenSize / 4);
-    gc.lineTo(-screenSize * 1.8, screenSize / 4);
-    gc.closePath();
-    gc.fill();
-    gc.stroke();
-
-    // Draw eye
-    double screenEyeRadius = screenSize * 0.3;
-    gc.setFill(darkTheme ? DarkTheme.EYE_COLOR : LightTheme.EYE_COLOR);
-    gc.fillOval(0, -screenEyeRadius, screenEyeRadius * 2, screenEyeRadius * 2);
-
-    // Draw field of view lines
-    drawFieldOfView(gc);
-
-    // Restore transform
-    gc.restore();
-  }
-
-  /** Draws the bird's field of view lines. */
-  private void drawFieldOfView(GraphicsContext gc) {
-    final double fovStart = -state.getEyeFovAngle() / 2;
-    final double cellAngle = state.getEyeFovAngle() / state.getEyeCells();
-
-    // Scale FOV range to screen coordinates
-    final double screenRange = getScreenFovRange();
-
-    gc.setStroke(darkTheme ? DarkTheme.EYE_COLOR : LightTheme.EYE_COLOR);
-    gc.setLineWidth(1);
-    gc.setLineDashes(2);
-
-    // Only draw lines for actual cell boundaries (cells, not cells+1)
-    for (int i = 0; i <= state.getEyeCells(); i++) {
-      // In model space: 0° is up, positive angles go CCW
-      // In screen space: 0° is right, positive angles go CW
-      // So we need to:
-      // 1. Rotate 90° to align up (0°) with right
-      // 2. Negate the angle to change direction (CCW -> CW)
-      double angle = fovStart + cellAngle * i;
-      double screenAngle = -angle;
-      double x = Math.cos(screenAngle) * screenRange;
-      double y = Math.sin(screenAngle) * screenRange;
-      gc.strokeLine(0, 0, x, y);
-    }
-
-    gc.setLineDashes(null);
-  }
-
-  /**
-   * Draws the bird's eye sensors, showing what each cell detects.
-   *
-   * @param bird bird to draw sensors for
-   */
-  private void drawEyeSensors(GraphicsContext gc, Bird bird) {
-    final Vector2D screenPos = worldToScreen(bird.getPosition());
-    final float[] eyeInputs = bird.getVision();
-    final double screenRange = getScreenFovRange();
-    final double fovStart = bird.getRotation() - state.getEyeFovAngle() / 2;
-    final double cellAngle = state.getEyeFovAngle() / state.getEyeCells();
-
-    for (int i = 0; i < state.getEyeCells(); i++) {
-      float input = eyeInputs[i];
-
-      // Positive strength means food, negative means a wall, zero means nothing in range. Alpha
-      // tracks the strength, so a far item is drawn fainter than a near one.
-      final Color sensorColor;
-      if (input == 0.0f) {
-        sensorColor = darkTheme ? DarkTheme.SENSOR_EMPTY_COLOR : LightTheme.SENSOR_EMPTY_COLOR;
-      } else if (input > 0.0f) {
-        sensorColor = Color.rgb(0, 255, 0, Math.clamp(input, 0.0f, 1.0f));
-      } else {
-        sensorColor = Color.rgb(255, 0, 0, Math.clamp(-input, 0.0f, 1.0f));
-      }
-
-      // Draw sensor arc
-      gc.setFill(sensorColor);
-      gc.beginPath();
-      gc.moveTo(screenPos.x(), screenPos.y());
-
-      // Convert from model space (0° up, CCW) to screen space (0° right, CW)
-      double startScreenAngle = 90 - Math.toDegrees(fovStart + cellAngle * i);
-      double sweepAngle = -Math.toDegrees(cellAngle); // Negative because we're going CW
-
-      gc.arc(screenPos.x(), screenPos.y(), screenRange, screenRange, startScreenAngle, sweepAngle);
-      gc.lineTo(screenPos.x(), screenPos.y());
-      gc.closePath();
-      gc.fill();
+      inspectorRenderer.draw(gc, hoveredBird, theme, transform);
     }
   }
 
   /**
-   * Draws the bird's movement trail.
+   * Returns the model-to-screen mapping for the canvas's current size.
    *
-   * @param bird bird to draw trail for
+   * @return the transform for this frame
    */
-  private void drawBirdTrail(GraphicsContext gc, Bird bird) {
-    Vector2D screenPos = worldToScreen(bird.getPosition());
-    Vector2D screenPrevPos = worldToScreen(bird.getPreviousPosition());
-
-    gc.setStroke(darkTheme ? DarkTheme.TRAIL_COLOR : LightTheme.TRAIL_COLOR);
-    gc.setLineWidth(getScreenBirdSize() * 0.8);
-    gc.strokeLine(screenPrevPos.x(), screenPrevPos.y(), screenPos.x(), screenPos.y());
-  }
-
-  /** Converts model space coordinates (0.0 to 1.0) to screen coordinates. */
-  private Vector2D worldToScreen(Vector2D modelPos) {
-    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
-    return new Vector2D(
-        (float) (modelPos.x() * worldScale), (float) ((1 - modelPos.y()) * worldScale));
-  }
-
-  /** Converts screen coordinates to model space coordinates (0.0 to 1.0). */
-  private Vector2D screenToWorld(Vector2D screenPos) {
-    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
-    return new Vector2D(
-        (float) (screenPos.x() / worldScale), (float) (1 - screenPos.y() / worldScale));
-  }
-
-  /** Gets the bird size in screen coordinates. */
-  private double getScreenBirdSize() {
-    // Scale bird size relative to smallest screen dimension to maintain proportions
-    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
-    return state.getBirdSize() * worldScale;
-  }
-
-  /** Gets the food size in screen coordinates. */
-  private double getScreenFoodSize() {
-    // Scale food size relative to smallest screen dimension to maintain proportions
-    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
-    return state.getFoodSize() * worldScale;
-  }
-
-  /** Gets the field of view range in screen coordinates. */
-  private double getScreenFovRange() {
-    // Scale fov range relative to smallest screen dimension to maintain proportions
-    double worldScale = Math.min(canvas.getWidth(), canvas.getHeight());
-    return state.getEyeFovRange() * worldScale;
+  private SceneTransform transform() {
+    return new SceneTransform(canvas.getWidth(), canvas.getHeight());
   }
 }
