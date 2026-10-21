@@ -9,7 +9,6 @@ package io.jshorelark.simulation.ui;
 import io.jshorelark.simulation.ui.controls.ControlBuilder;
 import io.jshorelark.simulation.ui.icons.SvgIcons;
 import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -37,73 +36,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public final class SimulationControls extends VBox {
 
-  /** Wrapper for SimulationApplication to prevent external modification. */
-  private static class SimulationApplicationWrapper {
-    private final SimulationApplication app;
-
-    private SimulationApplicationWrapper(SimulationApplication app) {
-      this.app = app;
-    }
-
-    public boolean isPaused() {
-      return app.isPaused();
-    }
-
-    public void setPaused(boolean paused) {
-      app.setPaused(paused);
-    }
-
-    public void resetSimulation() {
-      app.resetSimulation();
-    }
-
-    public void addFood(int amount) {
-      app.addFood(amount);
-    }
-
-    public void setSimulationSpeed(double speed) {
-      app.setSimulationSpeed(speed);
-    }
-
-    public int getGeneration() {
-      return app.getGeneration();
-    }
-
-    public int getPopulationSize() {
-      return app.getPopulationSize();
-    }
-
-    public double getBestFitness() {
-      return app.getBestFitness();
-    }
-
-    public ReadOnlyBooleanProperty pausedProperty() {
-      return app.pausedProperty();
-    }
-
-    public void toggleSound() {
-      app.toggleSound();
-    }
-
-    public boolean isSoundEnabled() {
-      return app.isSoundEnabled();
-    }
-
-    public double getGenerationProgress() {
-      return app.getGenerationProgress();
-    }
-
-    public void setVolume(float volume) {
-      app.setVolume(volume);
-    }
-
-    public float getVolume() {
-      return app.getVolume();
-    }
-  }
-
-  /** The wrapped main application. */
-  private final SimulationApplicationWrapper app;
+  /** The commands this panel issues and the state it reads back. */
+  private final SimulationCommands app;
 
   /** Play/pause button. */
   private final Button playButton;
@@ -138,10 +72,10 @@ public final class SimulationControls extends VBox {
   /**
    * Creates a new controls panel.
    *
-   * @param app the main application
+   * @param app the commands and state this panel drives; normally the application itself
    */
-  public SimulationControls(SimulationApplication app) {
-    this.app = new SimulationApplicationWrapper(app);
+  public SimulationControls(SimulationCommands app) {
+    this.app = java.util.Objects.requireNonNull(app, "app");
 
     // Set up layout
     setSpacing(10);

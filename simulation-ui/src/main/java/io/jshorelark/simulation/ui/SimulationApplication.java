@@ -38,7 +38,7 @@ import lombok.extern.slf4j.Slf4j;
  * @version $Id: $Id
  */
 @Slf4j
-public class SimulationApplication extends Application {
+public class SimulationApplication extends Application implements SimulationCommands {
   /** Wrapper for EvolutionManager to prevent external modification. */
   public static class EvolutionManagerWrapper {
     private final EvolutionManager manager;
@@ -153,6 +153,7 @@ public class SimulationApplication extends Application {
    *
    * @return a boolean
    */
+  @Override
   public boolean isPaused() {
     return paused.get();
   }
@@ -162,6 +163,7 @@ public class SimulationApplication extends Application {
    *
    * @param value a boolean
    */
+  @Override
   public void setPaused(boolean value) {
     paused.set(value);
   }
@@ -171,6 +173,7 @@ public class SimulationApplication extends Application {
    *
    * @return a {@link javafx.beans.property.ReadOnlyBooleanProperty} object
    */
+  @Override
   public ReadOnlyBooleanProperty pausedProperty() {
     return paused.getReadOnlyProperty();
   }
@@ -180,6 +183,7 @@ public class SimulationApplication extends Application {
    *
    * @return a int
    */
+  @Override
   public int getGeneration() {
     return evolutionManager.getGeneration();
   }
@@ -189,6 +193,7 @@ public class SimulationApplication extends Application {
    *
    * @return a int
    */
+  @Override
   public int getPopulationSize() {
     return evolutionManager.getBirds().size();
   }
@@ -198,7 +203,8 @@ public class SimulationApplication extends Application {
    *
    * @return a float
    */
-  public float getBestFitness() {
+  @Override
+  public double getBestFitness() {
     var stats = evolutionManager.getStatistics();
     return stats != null ? stats.maxFitness() : 0.0f;
   }
@@ -208,6 +214,7 @@ public class SimulationApplication extends Application {
    *
    * @param speed a double
    */
+  @Override
   public void setSimulationSpeed(double speed) {
     this.simulationSpeed = speed;
   }
@@ -227,6 +234,7 @@ public class SimulationApplication extends Application {
   }
 
   /** Resets the simulation to the reference configuration. */
+  @Override
   public void resetSimulation() {
     boolean wasPaused = isPaused();
     setPaused(true);
@@ -239,6 +247,7 @@ public class SimulationApplication extends Application {
    *
    * @param count a int
    */
+  @Override
   public void addFood(int count) {
     evolutionManager.addFoods(count, random);
     println("Added " + count + " food items");
@@ -638,6 +647,7 @@ public class SimulationApplication extends Application {
    *
    * @return a double representing the progress
    */
+  @Override
   public double getGenerationProgress() {
     return evolutionManager == null ? 0.0 : evolutionManager.getGenerationProgress();
   }
@@ -650,23 +660,27 @@ public class SimulationApplication extends Application {
   }
 
   /** Toggles sound on/off. */
+  @Override
   public void toggleSound() {
     soundEnabled = !soundEnabled;
     soundManager.setEnabled(soundEnabled);
   }
 
   /** Returns whether sound is enabled. */
+  @Override
   public boolean isSoundEnabled() {
     return soundEnabled;
   }
 
   /** Sets the volume level (0.0 to 1.0). */
+  @Override
   public void setVolume(float volume) {
     this.volume = volume;
     soundManager.setVolume(volume);
   }
 
   /** Gets the current volume level (0.0 to 1.0). */
+  @Override
   public float getVolume() {
     return volume;
   }
